@@ -25,6 +25,11 @@ Optional properties:
 - pinctrl-names, pinctrl-0, pincntrl-1: references to our pincntrl settings
 - clocks, clock-names: must contain the NQxxxx's core clock.
 - qcom,nq-esepwr: gpio to control power of secure element
+- qcom,nq-postinit-cmd: u8 array (/bits/ 8) sent over i2c once the controller
+                        is up. The first byte is the expected response
+                        length, the others are the command, e.g. to
+                        configure the SWP/SVDD link to a secure element:
+                        <0x5 0x20 0x02 0x05 0x01 0xA0 0xF2 0x01 0x01>
 - qcom,nq-vdd-1p8-supply: name of LDO to which NFC is connected
 - qcom,nq-vdd-1p8-voltage: min and max voltage(in uV) requirement for NFC
 - qcom,nq-vdd-1p8-current: max current(in uA) expected by NFC
