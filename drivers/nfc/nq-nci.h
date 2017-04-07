@@ -23,6 +23,7 @@
 #define SET_RX_BLOCK			_IOW(0xE9, 0x04, unsigned int)
 #define SET_EMULATOR_TEST_POINT		_IOW(0xE9, 0x05, unsigned int)
 #define NFCC_INITIAL_CORE_RESET_NTF	_IOW(0xE9, 0x10, unsigned int)
+#define ESE_CLEAR_GPIO			_IOW(0xE9, 0x11, unsigned int)
 
 #define DEV_COUNT			1
 #define DEVICE_NAME			"nq-nci"
