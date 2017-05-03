@@ -17,6 +17,7 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/timer.h>
+#include <linux/hrtimer.h>
 #include <linux/leds.h>
 #include "../leds.h"
 
@@ -26,6 +27,7 @@ struct transient_trig_data {
 	int restore_state;
 	unsigned long duration;
 	struct timer_list timer;
+	struct hrtimer hrtimer;
 	struct led_classdev *led_cdev;
 };
 
@@ -37,6 +39,57 @@ static void transient_timer_function(struct timer_list *t)
 
 	transient_data->activate = 0;
 	led_set_brightness_nosleep(led_cdev, transient_data->restore_state);
+}
+
+static enum hrtimer_restart transient_hrtimer_function(struct hrtimer *timer)
+{
+	struct transient_trig_data *transient_data =
+		container_of(timer, struct transient_trig_data, hrtimer);
+	struct led_classdev *led_cdev = transient_data->led_cdev;
+
+	transient_data->activate = 0;
+	led_set_brightness_nosleep(led_cdev, transient_data->restore_state);
+
+	return HRTIMER_NORESTART;
+}
+
+/*
+ * LEDs flagged LED_BRIGHTNESS_FAST (e.g. haptics) get sub-jiffy timing
+ * from an hrtimer; all others keep the regular jiffies timer.
+ */
+static inline void transient_timer_setup(struct led_classdev *led_cdev)
+{
+	struct transient_trig_data *tdata = led_get_trigger_data(led_cdev);
+
+	if (led_cdev->flags & LED_BRIGHTNESS_FAST) {
+		hrtimer_init(&tdata->hrtimer, CLOCK_MONOTONIC,
+			     HRTIMER_MODE_REL);
+		tdata->hrtimer.function = transient_hrtimer_function;
+	} else {
+		timer_setup(&tdata->timer, transient_timer_function, 0);
+	}
+}
+
+static inline void transient_timer_start(struct led_classdev *led_cdev)
+{
+	struct transient_trig_data *tdata = led_get_trigger_data(led_cdev);
+
+	if (led_cdev->flags & LED_BRIGHTNESS_FAST)
+		hrtimer_start(&tdata->hrtimer, ms_to_ktime(tdata->duration),
+			      HRTIMER_MODE_REL);
+	else
+		mod_timer(&tdata->timer,
+			  jiffies + msecs_to_jiffies(tdata->duration));
+}
+
+static inline void transient_timer_cancel(struct led_classdev *led_cdev)
+{
+	struct transient_trig_data *tdata = led_get_trigger_data(led_cdev);
+
+	if (led_cdev->flags & LED_BRIGHTNESS_FAST)
+		hrtimer_cancel(&tdata->hrtimer);
+	else
+		del_timer_sync(&tdata->timer);
 }
 
 static ssize_t transient_activate_show(struct device *dev,
@@ -66,7 +119,7 @@ static ssize_t transient_activate_store(struct device *dev,
 
 	/* cancel the running timer */
 	if (state == 0 && transient_data->activate == 1) {
-		del_timer(&transient_data->timer);
+		transient_timer_cancel(led_cdev);
 		transient_data->activate = state;
 		led_set_brightness_nosleep(led_cdev,
 					transient_data->restore_state);
@@ -80,8 +133,7 @@ static ssize_t transient_activate_store(struct device *dev,
 		led_set_brightness_nosleep(led_cdev, transient_data->state);
 		transient_data->restore_state =
 		    (transient_data->state == LED_FULL) ? LED_OFF : LED_FULL;
-		mod_timer(&transient_data->timer,
-			  jiffies + msecs_to_jiffies(transient_data->duration));
+		transient_timer_start(led_cdev);
 	}
 
 	/* state == 0 && transient_data->activate == 0
@@ -171,7 +223,7 @@ static int transient_trig_activate(struct led_classdev *led_cdev)
 	led_set_trigger_data(led_cdev, tdata);
 	tdata->led_cdev = led_cdev;
 
-	timer_setup(&tdata->timer, transient_timer_function, 0);
+	transient_timer_setup(led_cdev);
 
 	return 0;
 }
@@ -180,7 +232,7 @@ static void transient_trig_deactivate(struct led_classdev *led_cdev)
 {
 	struct transient_trig_data *transient_data = led_get_trigger_data(led_cdev);
 
-	del_timer_sync(&transient_data->timer);
+	transient_timer_cancel(led_cdev);
 	led_set_brightness_nosleep(led_cdev, transient_data->restore_state);
 	kfree(transient_data);
 }
