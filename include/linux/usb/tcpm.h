@@ -127,6 +127,9 @@ struct tcpc_config {
  *		automatically if a connection is established.
  * @try_role:	Optional; called to set a preferred role
  * @pd_transmit:Called to transmit PD message
+ * @set_in_pr_swap:
+ *		Optional; called to notify that a power role swap is in
+ *		progress (true) or has completed or been aborted (false).
  * @mux:	Pointer to multiplexer data
  */
 struct tcpc_dev {
@@ -153,6 +156,7 @@ struct tcpc_dev {
 	int (*try_role)(struct tcpc_dev *dev, int role);
 	int (*pd_transmit)(struct tcpc_dev *dev, enum tcpm_transmit_type type,
 			   const struct pd_message *msg);
+	int (*set_in_pr_swap)(struct tcpc_dev *dev, bool pr_swap);
 };
 
 struct tcpm_port;
