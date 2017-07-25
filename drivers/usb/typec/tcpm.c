@@ -753,6 +753,14 @@ static int tcpm_set_current_limit(struct tcpm_port *port, u32 max_ma, u32 mv)
 	return ret;
 }
 
+static void tcpm_set_in_pr_swap(struct tcpm_port *port, bool pr_swap)
+{
+	tcpm_log(port, "in PR_SWAP := %s", pr_swap ? "true" : "false");
+
+	if (port->tcpc->set_in_pr_swap)
+		port->tcpc->set_in_pr_swap(port->tcpc, pr_swap);
+}
+
 /*
  * Determine RP value to set based on maximum current supported
  * by a port if configured as source.
@@ -2884,6 +2892,7 @@ static void run_state_machine(struct tcpm_port *port)
 	port->enter_state = port->state;
 	switch (port->state) {
 	case TOGGLING:
+		tcpm_set_in_pr_swap(port, false);
 		break;
 	/* SRC states */
 	case SRC_UNATTACHED:
@@ -3056,6 +3065,7 @@ static void run_state_machine(struct tcpm_port *port)
 		tcpm_set_state_cond(port, SRC_READY, 0);
 		break;
 	case SRC_READY:
+		tcpm_set_in_pr_swap(port, false);
 #if 1
 		port->hard_reset_count = 0;
 #endif
@@ -3269,6 +3279,7 @@ static void run_state_machine(struct tcpm_port *port)
 			       PD_T_PS_TRANSITION);
 		break;
 	case SNK_READY:
+		tcpm_set_in_pr_swap(port, false);
 		port->try_snk_count = 0;
 		port->update_sink_caps = false;
 		if (port->explicit_contract) {
@@ -3438,6 +3449,7 @@ static void run_state_machine(struct tcpm_port *port)
 		tcpm_set_state(port, ready_state(port), 0);
 		break;
 	case PR_SWAP_START:
+		tcpm_set_in_pr_swap(port, true);
 		if (port->pwr_role == TYPEC_SOURCE)
 			tcpm_set_state(port, PR_SWAP_SRC_SNK_TRANSITION_OFF,
 				       PD_T_SRC_TRANSITION);
