@@ -132,6 +132,9 @@ struct tcpc_config {
  * @set_in_pr_swap:
  *		Optional; called to notify that a power role swap is in
  *		progress (true) or has completed or been aborted (false).
+ * @set_pd_capable:
+ *		Optional; called to notify that a PD capable partner has
+ *		been detected (true), or that it is gone (false).
  * @mux:	Pointer to multiplexer data
  */
 struct tcpc_dev {
@@ -160,6 +163,7 @@ struct tcpc_dev {
 	int (*pd_transmit)(struct tcpc_dev *dev, enum tcpm_transmit_type type,
 			   const struct pd_message *msg);
 	int (*set_in_pr_swap)(struct tcpc_dev *dev, bool pr_swap);
+	void (*set_pd_capable)(struct tcpc_dev *dev, bool capable);
 };
 
 struct tcpm_port;
