@@ -288,6 +288,9 @@ struct tcpm_port {
 	u32 current_limit;
 	u32 supply_voltage;
 
+	u32 supply_min_mv;
+	u32 supply_max_mv;
+
 	/* Used to export TA voltage and current */
 	struct power_supply *psy;
 	struct power_supply_desc psy_desc;
@@ -738,19 +741,32 @@ static u32 tcpm_get_current_limit(struct tcpm_port *port)
 	return limit;
 }
 
-static int tcpm_set_current_limit(struct tcpm_port *port, u32 max_ma, u32 mv)
+static int __tcpm_set_current_limit(struct tcpm_port *port, u32 max_ma,
+				    u32 min_mv, u32 max_mv)
 {
 	int ret = -EOPNOTSUPP;
 
-	tcpm_log(port, "Setting voltage/current limit %u mV %u mA", mv, max_ma);
+	tcpm_log(port, "Setting voltage/current limit %u-%u mV %u mA",
+		 min_mv, max_mv, max_ma);
 
+	if (port->tcpc->set_current_limit)
+		ret = port->tcpc->set_current_limit(port->tcpc, max_ma, min_mv,
+						    max_mv);
+
+	if (!ret) {
+		port->supply_min_mv = min_mv;
+		port->supply_max_mv = max_mv;
+	}
+
+	return ret;
+}
+
+static int tcpm_set_current_limit(struct tcpm_port *port, u32 max_ma, u32 mv)
+{
 	port->supply_voltage = mv;
 	port->current_limit = max_ma;
 
-	if (port->tcpc->set_current_limit)
-		ret = port->tcpc->set_current_limit(port->tcpc, max_ma, mv);
-
-	return ret;
+	return __tcpm_set_current_limit(port, max_ma, mv, mv);
 }
 
 static void tcpm_set_in_pr_swap(struct tcpm_port *port, bool pr_swap)
@@ -3274,6 +3290,16 @@ static void run_state_machine(struct tcpm_port *port)
 		}
 		break;
 	case SNK_TRANSITION_SINK:
+		if (!port->pps_data.active) {
+			u32 min_mv, max_mv;
+
+			min_mv = min(port->supply_min_mv, port->supply_voltage);
+			max_mv = max(port->supply_max_mv, port->supply_voltage);
+			if (max_mv)
+				__tcpm_set_current_limit(port,
+						PD_P_SNKSTDBY * 1000 / max_mv,
+						min_mv, max_mv);
+		}
 	case SNK_TRANSITION_SINK_VBUS:
 		tcpm_set_state(port, hard_reset_state(port),
 			       PD_T_PS_TRANSITION);
