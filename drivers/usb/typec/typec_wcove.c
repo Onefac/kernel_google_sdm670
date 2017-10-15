@@ -322,7 +322,8 @@ static int wcove_set_polarity(struct tcpc_dev *tcpc, enum typec_cc_polarity pol)
 	return wcove_typec_func(wcove, WCOVE_FUNC_ORIENTATION, pol);
 }
 
-static int wcove_set_current_limit(struct tcpc_dev *tcpc, u32 max_ma, u32 mv)
+static int wcove_set_current_limit(struct tcpc_dev *tcpc, u32 max_ma,
+				   u32 min_mv, u32 max_mv)
 {
 	return 0;
 }

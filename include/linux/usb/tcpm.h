@@ -118,7 +118,9 @@ struct tcpc_config {
  * @set_vbus:	Called to enable or disable VBUS
  * @set_current_limit:
  *		Optional; called to set current limit as negotiated
- *		with partner.
+ *		with partner. @min_mv and @max_mv give the range VBUS
+ *		is expected to be in; they differ while the source is
+ *		transitioning between two voltages.
  * @set_pd_rx:	Called to enable or disable reception of PD messages
  * @set_roles:	Called to set power and data roles
  * @start_toggling:
@@ -146,7 +148,8 @@ struct tcpc_dev {
 			    enum typec_cc_polarity polarity);
 	int (*set_vconn)(struct tcpc_dev *dev, bool on);
 	int (*set_vbus)(struct tcpc_dev *dev, bool on, bool charge);
-	int (*set_current_limit)(struct tcpc_dev *dev, u32 max_ma, u32 mv);
+	int (*set_current_limit)(struct tcpc_dev *dev, u32 max_ma, u32 min_mv,
+				 u32 max_mv);
 	int (*set_pd_rx)(struct tcpc_dev *dev, bool on);
 	int (*set_roles)(struct tcpc_dev *dev, bool attached,
 			 enum typec_role role, enum typec_data_role data);
