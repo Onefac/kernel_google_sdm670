@@ -779,6 +779,14 @@ static void tcpm_set_pd_capable(struct tcpm_port *port, bool capable)
 	port->pd_capable = capable;
 }
 
+static void tcpm_port_in_hard_reset(struct tcpm_port *port, bool status)
+{
+	tcpm_log(port, "Setting hard reset %s", status ? "true" : "false");
+
+	if (port->tcpc->set_in_hard_reset)
+		port->tcpc->set_in_hard_reset(port->tcpc, status);
+}
+
 static void tcpm_set_in_pr_swap(struct tcpm_port *port, bool pr_swap)
 {
 	tcpm_log(port, "in PR_SWAP := %s", pr_swap ? "true" : "false");
@@ -2922,6 +2930,7 @@ static void run_state_machine(struct tcpm_port *port)
 		break;
 	/* SRC states */
 	case SRC_UNATTACHED:
+		tcpm_port_in_hard_reset(port, false);
 		if (!port->non_pd_role_swap)
 			tcpm_swap_complete(port, -ENOTCONN);
 		tcpm_src_detach(port);
@@ -3121,6 +3130,7 @@ static void run_state_machine(struct tcpm_port *port)
 
 	/* SNK states */
 	case SNK_UNATTACHED:
+		tcpm_port_in_hard_reset(port, false);
 		if (!port->non_pd_role_swap)
 			tcpm_swap_complete(port, -ENOTCONN);
 		tcpm_pps_complete(port, -ENOTCONN);
@@ -3205,6 +3215,7 @@ static void run_state_machine(struct tcpm_port *port)
 			tcpm_set_state(port, SNK_STARTUP, 0);
 		break;
 	case SNK_STARTUP:
+		tcpm_port_in_hard_reset(port, false);
 		opmode =  tcpm_get_pwr_opmode(port->polarity ?
 					      port->cc2 : port->cc1);
 		typec_set_pwr_opmode(port->typec_port, opmode);
@@ -3354,6 +3365,7 @@ static void run_state_machine(struct tcpm_port *port)
 		tcpm_set_state(port, HARD_RESET_START, 0);
 		break;
 	case HARD_RESET_START:
+		tcpm_port_in_hard_reset(port, true);
 		port->hard_reset_count++;
 		port->tcpc->set_pd_rx(port->tcpc, false);
 		tcpm_unregister_altmodes(port);
