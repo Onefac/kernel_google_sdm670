@@ -135,6 +135,9 @@ struct tcpc_config {
  * @set_pd_capable:
  *		Optional; called to notify that a PD capable partner has
  *		been detected (true), or that it is gone (false).
+ * @set_in_hard_reset:
+ *		Optional; called to notify that a hard reset is in progress
+ *		(true) or is over (false).
  * @mux:	Pointer to multiplexer data
  */
 struct tcpc_dev {
@@ -164,6 +167,7 @@ struct tcpc_dev {
 			   const struct pd_message *msg);
 	int (*set_in_pr_swap)(struct tcpc_dev *dev, bool pr_swap);
 	void (*set_pd_capable)(struct tcpc_dev *dev, bool capable);
+	void (*set_in_hard_reset)(struct tcpc_dev *dev, bool status);
 };
 
 struct tcpm_port;
