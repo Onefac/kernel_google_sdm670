@@ -592,6 +592,9 @@ static int smb2_usb_set_prop(struct power_supply *psy,
 			vote(chg->disable_power_role_switch, MOISTURE_VOTER,
 			     val->intval > 0, 0);
 			break;
+		case POWER_SUPPLY_PROP_TYPEC_POWER_ROLE:
+			rc = smblib_set_prop_typec_power_role(chg, val);
+			break;
 		case POWER_SUPPLY_PROP_PD_IN_EXPLICIT_CONTRACT:
 			chg->in_explicit_contract = val->intval;
 			power_supply_changed(chg->usb_psy);
