@@ -586,7 +586,8 @@ static int smb2_usb_set_prop(struct power_supply *psy,
 	int rc = 0;
 
 	mutex_lock(&chg->lock);
-	if (!chg->typec_present) {
+	if (!chg->typec_present &&
+	    psp != POWER_SUPPLY_PROP_TYPEC_POWER_ROLE) {
 		switch (psp) {
 		case POWER_SUPPLY_PROP_MOISTURE_DETECTED:
 			vote(chg->disable_power_role_switch, MOISTURE_VOTER,
