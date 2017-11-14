@@ -9,7 +9,6 @@ Required properties:
 - qcom,nq-ven: specific gpio for hardware reset.
 - qcom,nq-irq: specific gpio for read interrupt.
 - qcom,nq-firm: gpio for firmware download
-- qcom,nq-clkreq: gpio for clock
 - interrupt-parent: Should be phandle for the interrupt controller
                     that services interrupts for this device.
 - interrupts: Nfc read interrupt,gpio-clk-req interrupt
@@ -24,6 +23,8 @@ Optional properties:
 
 - pinctrl-names, pinctrl-0, pincntrl-1: references to our pincntrl settings
 - clocks, clock-names: must contain the NQxxxx's core clock.
+- qcom,nq-clkreq: gpio for clock; may be omitted when the controller is not
+                  clocked through the host
 - qcom,nq-esepwr: gpio to control power of secure element
 - qcom,nq-postinit-cmd: u8 array (/bits/ 8) sent over i2c once the controller
                         is up. The first byte is the expected response
