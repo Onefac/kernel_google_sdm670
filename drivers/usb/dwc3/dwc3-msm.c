@@ -343,6 +343,7 @@ struct dwc3_msm {
 	atomic_t                in_p3;
 	unsigned int		lpm_to_suspend_delay;
 	u32			auto_vbus_src_sel_threshold;
+	bool			no_vbus_vote_type_c;
 	enum plug_orientation	typec_orientation;
 	u32			num_gsi_event_buffers;
 	struct dwc3_event_buffer **gsi_ev_buff;
@@ -3831,6 +3832,9 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	mdwc->charging_disabled = of_property_read_bool(node,
 				"qcom,charging-disabled");
 
+	mdwc->no_vbus_vote_type_c = of_property_read_bool(node,
+					"qcom,no-vbus-vote-with-type-C");
+
 	ret = of_property_read_u32(node, "google,switch-vbus",
 				   &mdwc->auto_vbus_src_sel_threshold);
 	if (ret) {
@@ -4417,7 +4421,7 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 	 * IS_ERR: regulator could not be obtained, so skip using it
 	 * Valid pointer otherwise
 	 */
-	if (!mdwc->vbus_reg) {
+	if (!mdwc->vbus_reg && !mdwc->no_vbus_vote_type_c) {
 		mdwc->vbus_reg = devm_regulator_get_optional(mdwc->dev,
 					"vbus_dwc3");
 		if (PTR_ERR(mdwc->vbus_reg) == -EPROBE_DEFER) {
