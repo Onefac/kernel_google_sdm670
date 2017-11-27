@@ -46,6 +46,7 @@
 #include "dbm.h"
 #include "debug.h"
 #include "xhci.h"
+#include "../pd/usbpd.h"
 
 static bool bc12_compliance;
 module_param(bc12_compliance, bool, 0644);
@@ -341,6 +342,7 @@ struct dwc3_msm {
 
 	atomic_t                in_p3;
 	unsigned int		lpm_to_suspend_delay;
+	u32			auto_vbus_src_sel_threshold;
 	enum plug_orientation	typec_orientation;
 	u32			num_gsi_event_buffers;
 	struct dwc3_event_buffer **gsi_ev_buff;
@@ -3638,6 +3640,29 @@ static ssize_t usb_compliance_mode_store(struct device *dev,
 }
 static DEVICE_ATTR_RW(usb_compliance_mode);
 
+static ssize_t auto_vbus_src_sel_threshold_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	return snprintf(buf, PAGE_SIZE, "%u\n",
+		mdwc->auto_vbus_src_sel_threshold);
+}
+
+static ssize_t auto_vbus_src_sel_threshold_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+	int ret;
+
+	ret = kstrtou32(buf, 10, &mdwc->auto_vbus_src_sel_threshold);
+	if (ret)
+		return ret;
+
+	return count;
+}
+static DEVICE_ATTR_RW(auto_vbus_src_sel_threshold);
+
 static ssize_t bus_vote_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -3805,6 +3830,14 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 
 	mdwc->charging_disabled = of_property_read_bool(node,
 				"qcom,charging-disabled");
+
+	ret = of_property_read_u32(node, "google,switch-vbus",
+				   &mdwc->auto_vbus_src_sel_threshold);
+	if (ret) {
+		dev_dbg(&pdev->dev,
+			"setting auto_vbus_src_sel_threshold to zero.\n");
+		mdwc->auto_vbus_src_sel_threshold = 0;
+	}
 
 	ret = of_property_read_u32(node, "qcom,lpm-to-suspend-delay-ms",
 				&mdwc->lpm_to_suspend_delay);
@@ -4129,6 +4162,7 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	device_create_file(&pdev->dev, &dev_attr_mode);
 	device_create_file(&pdev->dev, &dev_attr_speed);
 	device_create_file(&pdev->dev, &dev_attr_usb_compliance_mode);
+	device_create_file(&pdev->dev, &dev_attr_auto_vbus_src_sel_threshold);
 	device_create_file(&pdev->dev, &dev_attr_bus_vote);
 	device_create_file(&pdev->dev, &dev_attr_usb_data_enabled);
 
@@ -4152,6 +4186,7 @@ static int dwc3_msm_remove(struct platform_device *pdev)
 	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
 	int ret_pm;
 
+	device_remove_file(&pdev->dev, &dev_attr_auto_vbus_src_sel_threshold);
 	device_remove_file(&pdev->dev, &dev_attr_mode);
 	device_remove_file(&pdev->dev, &dev_attr_usb_data_enabled);
 
@@ -4231,6 +4266,40 @@ static int dwc3_msm_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static bool dwc3_use_external_vbus_booster(struct usb_device *udev,
+					   struct dwc3 *dwc,
+					   struct dwc3_msm *mdwc)
+{
+	unsigned int max_power;
+
+	if (!udev->actconfig)
+		return false;
+
+	if (udev->speed >= USB_SPEED_SUPER)
+		max_power = udev->actconfig->desc.bMaxPower * 8;
+	else
+		max_power = udev->actconfig->desc.bMaxPower * 2;
+
+	return udev->parent && !udev->parent->parent &&
+	       udev->dev.parent->parent == &dwc->xhci->dev &&
+	       udev->descriptor.bDeviceClass != USB_CLASS_HUB &&
+	       max_power < mdwc->auto_vbus_src_sel_threshold;
+}
+
+static BLOCKING_NOTIFIER_HEAD(ext_vbus_notifier_list);
+
+void ext_vbus_register_notify(struct notifier_block *nb)
+{
+	blocking_notifier_chain_register(&ext_vbus_notifier_list, nb);
+}
+EXPORT_SYMBOL_GPL(ext_vbus_register_notify);
+
+void ext_vbus_unregister_notify(struct notifier_block *nb)
+{
+	blocking_notifier_chain_unregister(&ext_vbus_notifier_list, nb);
+}
+EXPORT_SYMBOL_GPL(ext_vbus_unregister_notify);
+
 static int dwc3_msm_host_notifier(struct notifier_block *nb,
 	unsigned long event, void *ptr)
 {
@@ -4272,6 +4341,16 @@ static int dwc3_msm_host_notifier(struct notifier_block *nb,
 			mdwc->max_rh_port_speed = USB_SPEED_UNKNOWN;
 			dwc3_msm_update_bus_bw(mdwc, mdwc->default_bus_vote);
 		}
+	}
+
+	if (mdwc->auto_vbus_src_sel_threshold) {
+		if (event == USB_DEVICE_ADD &&
+		    dwc3_use_external_vbus_booster(udev, dwc, mdwc))
+			blocking_notifier_call_chain(&ext_vbus_notifier_list,
+						     EXT_VBUS_ON, NULL);
+		else
+			blocking_notifier_call_chain(&ext_vbus_notifier_list,
+						     EXT_VBUS_OFF, NULL);
 	}
 
 	return NOTIFY_DONE;
