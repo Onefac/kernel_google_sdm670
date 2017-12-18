@@ -429,6 +429,7 @@ static enum power_supply_property smb2_usb_props[] = {
 	POWER_SUPPLY_PROP_SDP_CURRENT_MAX,
 	POWER_SUPPLY_PROP_CONNECTOR_TYPE,
 	POWER_SUPPLY_PROP_MOISTURE_DETECTED,
+	POWER_SUPPLY_PROP_OTG_FASTROLESWAP,
 };
 
 static int smb2_usb_get_prop(struct power_supply *psy,
@@ -528,6 +529,9 @@ static int smb2_usb_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_PD_USB_SUSPEND_SUPPORTED:
 		val->intval = chg->system_suspend_supported;
 		break;
+	case POWER_SUPPLY_PROP_OTG_FASTROLESWAP:
+		rc = smblib_get_prop_otg_fastroleswap(chg, val);
+		break;
 	case POWER_SUPPLY_PROP_PE_START:
 		rc = smblib_get_pe_start(chg, val);
 		break;
@@ -610,6 +614,9 @@ static int smb2_usb_set_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_PD_USB_SUSPEND_SUPPORTED:
 		chg->system_suspend_supported = val->intval;
+		break;
+	case POWER_SUPPLY_PROP_OTG_FASTROLESWAP:
+		rc = smblib_set_prop_otg_fastroleswap(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_BOOST_CURRENT:
 		rc = smblib_set_prop_boost_current(chg, val);
