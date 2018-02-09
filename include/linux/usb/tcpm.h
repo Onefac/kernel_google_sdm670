@@ -140,6 +140,11 @@ struct tcpc_config {
  *		(true) or is over (false).
  * @log_rtc:	Optional; called before each (non-forced) TCPM log entry is
  *		recorded, so the low level driver can log the RTC time.
+ * @set_suspend_supported:
+ *		Optional; called when operating as sink to notify whether
+ *		the source allows USB suspend (PDO_FIXED_SUSPEND), i.e.
+ *		whether the sink has to honor USB suspend or may keep drawing
+ *		the negotiated power while suspended.
  * @mux:	Pointer to multiplexer data
  */
 struct tcpc_dev {
@@ -171,6 +176,8 @@ struct tcpc_dev {
 	void (*set_pd_capable)(struct tcpc_dev *dev, bool capable);
 	void (*set_in_hard_reset)(struct tcpc_dev *dev, bool status);
 	void (*log_rtc)(struct tcpc_dev *dev);
+	int (*set_suspend_supported)(struct tcpc_dev *dev,
+				     bool suspend_supported);
 };
 
 struct tcpm_port;
