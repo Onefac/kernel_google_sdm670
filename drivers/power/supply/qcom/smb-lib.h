@@ -7,6 +7,7 @@
 #include <linux/types.h>
 #include <linux/interrupt.h>
 #include <linux/irqreturn.h>
+#include <linux/thermal.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/consumer.h>
 #include <linux/extcon-provider.h>
@@ -380,6 +381,10 @@ struct smb_charger {
 	int			usb_icl_delta_ua;
 	int			pulse_cnt;
 
+	/* USB port temperature */
+	const char		*usb_port_tz_name;
+	struct thermal_zone_device *usb_port_tz;
+
 	int			die_health;
 };
 
@@ -483,6 +488,8 @@ int smblib_get_prop_usb_voltage_max_design(struct smb_charger *chg,
 int smblib_get_prop_usb_voltage_now(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_get_prop_usb_current_now(struct smb_charger *chg,
+				union power_supply_propval *val);
+int smblib_get_prop_usb_port_temp(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_get_prop_typec_cc_orientation(struct smb_charger *chg,
 				union power_supply_propval *val);
