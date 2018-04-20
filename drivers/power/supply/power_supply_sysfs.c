@@ -91,7 +91,7 @@ static const char * const power_supply_usbc_text[] = {
 };
 
 static const char * const power_supply_usbc_pr_text[] = {
-	"none", "dual power role", "sink", "source"
+	"none", "dual power role", "sink", "source", "source_1_5"
 };
 
 static const char * const power_supply_typec_src_rp_text[] = {
