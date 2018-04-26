@@ -944,6 +944,13 @@ config MSM_BAM_DMUX
 	 provides a means to support more logical channels
 	 via muxing than BAM could without muxing.
 
+config MODEMSMEM
+	bool "Modem SMEM driver"
+	default N
+	---help---
+	Enable to pass device information and other data to shared memory for
+	the modem subsystem
+
 endmenu
 
 config QCOM_HYP_CORE_CTL
