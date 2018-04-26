@@ -946,6 +946,7 @@ config MSM_BAM_DMUX
 
 config MODEMSMEM
 	bool "Modem SMEM driver"
+	depends on QCOM_SMEM
 	default N
 	---help---
 	Enable to pass device information and other data to shared memory for

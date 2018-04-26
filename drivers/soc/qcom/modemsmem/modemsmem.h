@@ -22,6 +22,8 @@
 #define MODEM_SMEM_VERSION	0x0
 #define MODEM_FTM_MAGIC		0x6846544D
 
+#define SMEM_ID_VENDOR0		134
+
 struct modem_smem_type {
 	uint32_t	version;
 	uint32_t	modem_flag;

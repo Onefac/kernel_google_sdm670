@@ -23,7 +23,8 @@
 #include <linux/ctype.h>
 #include <linux/io.h>
 #include <soc/qcom/socinfo.h>
-#include <soc/qcom/smem.h>
+#include <linux/err.h>
+#include <linux/soc/qcom/smem.h>
 #include "modemsmem.h"
 
 #define BOOTMODE_LENGTH			20
@@ -59,16 +60,34 @@ static bool is_factory_bootmode(void)
 	return false;
 }
 
+static struct modem_smem_type *modem_smem_get(void)
+{
+	struct modem_smem_type *modem_smem;
+	size_t size;
+	int ret;
+
+	ret = qcom_smem_alloc(QCOM_SMEM_HOST_ANY, SMEM_ID_VENDOR0,
+			      sizeof(*modem_smem));
+	if (ret < 0 && ret != -EEXIST)
+		return ERR_PTR(ret);
+
+	modem_smem = qcom_smem_get(QCOM_SMEM_HOST_ANY, SMEM_ID_VENDOR0, &size);
+	if (IS_ERR(modem_smem))
+		return modem_smem;
+	if (size < sizeof(*modem_smem))
+		return ERR_PTR(-EINVAL);
+
+	return modem_smem;
+}
+
 static ssize_t modem_smem_show(struct device *d,
 			struct device_attribute *attr,
 			char *buf)
 {
 	struct modem_smem_type *modem_smem;
 
-	modem_smem = smem_alloc(SMEM_ID_VENDOR0,
-				sizeof(struct modem_smem_type),
-				0, SMEM_ANY_HOST_FLAG);
-	if (modem_smem) {
+	modem_smem = modem_smem_get();
+	if (!IS_ERR(modem_smem)) {
 		return snprintf(buf, PAGE_SIZE,
 				"version:0x%x\n"
 				"modem_flag:0x%x\n"
@@ -97,11 +116,9 @@ static ssize_t modem_smem_store(struct device *d,
 {
 	struct modem_smem_type *modem_smem;
 
-	modem_smem = smem_alloc(SMEM_ID_VENDOR0,
-				sizeof(struct modem_smem_type),
-				0, SMEM_ANY_HOST_FLAG);
+	modem_smem = modem_smem_get();
 
-	if (modem_smem == NULL) {
+	if (IS_ERR(modem_smem)) {
 		dev_err(d, "smem alloc fail\n");
 		return count;
 	}
@@ -167,12 +184,11 @@ static int modem_smem_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, dev);
 
 	/* Allocate with SMEM channel */
-	modem_smem = smem_alloc(SMEM_ID_VENDOR0,
-				sizeof(struct modem_smem_type),
-				0, SMEM_ANY_HOST_FLAG);
-	if (!modem_smem) {
-		dev_err(dev, "smem alloc fail\n");
-		return -ENOMEM;
+	modem_smem = modem_smem_get();
+	if (IS_ERR(modem_smem)) {
+		if (PTR_ERR(modem_smem) != -EPROBE_DEFER)
+			dev_err(dev, "smem alloc fail\n");
+		return PTR_ERR(modem_smem);
 	}
 
 	/* Initialize smem with zeros */
