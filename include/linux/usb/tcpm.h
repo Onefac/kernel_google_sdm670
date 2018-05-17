@@ -138,6 +138,8 @@ struct tcpc_config {
  * @set_in_hard_reset:
  *		Optional; called to notify that a hard reset is in progress
  *		(true) or is over (false).
+ * @log_rtc:	Optional; called before each (non-forced) TCPM log entry is
+ *		recorded, so the low level driver can log the RTC time.
  * @mux:	Pointer to multiplexer data
  */
 struct tcpc_dev {
@@ -168,6 +170,7 @@ struct tcpc_dev {
 	int (*set_in_pr_swap)(struct tcpc_dev *dev, bool pr_swap);
 	void (*set_pd_capable)(struct tcpc_dev *dev, bool capable);
 	void (*set_in_hard_reset)(struct tcpc_dev *dev, bool status);
+	void (*log_rtc)(struct tcpc_dev *dev);
 };
 
 struct tcpm_port;
