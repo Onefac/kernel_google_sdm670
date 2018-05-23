@@ -243,7 +243,8 @@ static int tcpci_set_vconn(struct tcpc_dev *tcpc, bool enable)
 }
 
 static int tcpci_set_roles(struct tcpc_dev *tcpc, bool attached,
-			   enum typec_role role, enum typec_data_role data)
+			   enum typec_role role, enum typec_data_role data,
+			   bool usb_comm_capable)
 {
 	struct tcpci *tcpci = tcpc_to_tcpci(tcpc);
 	unsigned int reg;
