@@ -329,7 +329,8 @@ static int wcove_set_current_limit(struct tcpc_dev *tcpc, u32 max_ma,
 }
 
 static int wcove_set_roles(struct tcpc_dev *tcpc, bool attached,
-			   enum typec_role role, enum typec_data_role data)
+			   enum typec_role role, enum typec_data_role data,
+			   bool usb_comm_capable)
 {
 	struct wcove_typec *wcove = tcpc_to_wcove(tcpc);
 	unsigned int val;

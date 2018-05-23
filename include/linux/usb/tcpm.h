@@ -122,7 +122,10 @@ struct tcpc_config {
  *		is expected to be in; they differ while the source is
  *		transitioning between two voltages.
  * @set_pd_rx:	Called to enable or disable reception of PD messages
- * @set_roles:	Called to set power and data roles
+ * @set_roles:	Called to set power and data roles. @usb_comm_capable
+ *		tells whether the partner advertised USB communication
+ *		capability in its PDO/RDO (only meaningful while a PD
+ *		contract is being established or is in place).
  * @start_toggling:
  *		Optional; if supported by hardware, called to start dual-role
  *		toggling or single-role connection detection. Toggling stops
@@ -165,7 +168,8 @@ struct tcpc_dev {
 				 u32 max_mv);
 	int (*set_pd_rx)(struct tcpc_dev *dev, bool on);
 	int (*set_roles)(struct tcpc_dev *dev, bool attached,
-			 enum typec_role role, enum typec_data_role data);
+			 enum typec_role role, enum typec_data_role data,
+			 bool usb_comm_capable);
 	int (*start_toggling)(struct tcpc_dev *dev,
 			      enum typec_port_type port_type,
 			      enum typec_cc_status cc);
