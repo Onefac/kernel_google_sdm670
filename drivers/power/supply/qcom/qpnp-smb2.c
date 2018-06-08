@@ -360,6 +360,7 @@ static int smb2_parse_dt(struct smb2 *chip)
 
 	chip->dt.hvdcp_disable = of_property_read_bool(node,
 						"qcom,hvdcp-disable");
+	chg->hvdcp_disable = chip->dt.hvdcp_disable;
 
 	of_property_read_u32(node, "qcom,chg-inhibit-threshold-mv",
 				&chip->dt.chg_inhibit_thr_mv);
@@ -1748,6 +1749,9 @@ static int smb2_init_hw(struct smb2 *chip)
 			true, 0);
 	vote(chg->pd_disallowed_votable_indirect, HVDCP_TIMEOUT_VOTER,
 			true, 0);
+	if (chg->hvdcp_disable)
+		vote(chg->pd_disallowed_votable_indirect, HVDCP_TIMEOUT_VOTER,
+				false, 0);
 	vote(chg->pd_disallowed_votable_indirect, PD_NOT_SUPPORTED_VOTER,
 			chip->dt.no_pd, 0);
 	/*

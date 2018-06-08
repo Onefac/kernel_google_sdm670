@@ -351,6 +351,7 @@ struct smb_charger {
 	bool			use_extcon;
 	bool			otg_present;
 	bool			is_audio_adapter;
+	bool			hvdcp_disable;
 	bool			disable_stat_sw_override;
 	bool			in_chg_lock;
 	bool			fcc_stepper_enable;
