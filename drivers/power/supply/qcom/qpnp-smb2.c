@@ -1292,7 +1292,7 @@ static int smb2_batt_set_prop(struct power_supply *psy,
 		}
 		break;
 	case POWER_SUPPLY_PROP_TAPER_CONTROL:
-		chg->taper_control_enabled = !!val->intval;
+		chg->taper_control_enabled = val->intval;
 		break;
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
 		chg->batt_profile_fcc_ua = val->intval;
@@ -2501,7 +2501,7 @@ static int smb2_probe(struct platform_device *pdev)
 	chg->mode = PARALLEL_MASTER;
 	chg->irq_info = smb2_irqs;
 	chg->die_health = -EINVAL;
-	chg->taper_control_enabled = true;
+	chg->taper_control_enabled = POWER_SUPPLY_TAPER_CONTROL_MODE_STEPPER;
 	chg->name = "PMI";
 	chg->audio_headset_drp_wait_ms = &__audio_headset_drp_wait_ms;
 
