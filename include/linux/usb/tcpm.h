@@ -148,6 +148,11 @@ struct tcpc_config {
  *		the source allows USB suspend (PDO_FIXED_SUSPEND), i.e.
  *		whether the sink has to honor USB suspend or may keep drawing
  *		the negotiated power while suspended.
+ * @in_pd_contract:
+ *		Optional; called to notify whether the port is in a PD
+ *		contract (true when entering SRC_READY/SNK_READY with a PD
+ *		capable partner, false on negotiation start, hard reset and
+ *		port reset).
  * @mux:	Pointer to multiplexer data
  */
 struct tcpc_dev {
@@ -182,6 +187,7 @@ struct tcpc_dev {
 	void (*log_rtc)(struct tcpc_dev *dev);
 	int (*set_suspend_supported)(struct tcpc_dev *dev,
 				     bool suspend_supported);
+	int (*in_pd_contract)(struct tcpc_dev *dev, bool status);
 };
 
 struct tcpm_port;
