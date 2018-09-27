@@ -1465,6 +1465,53 @@ static struct snd_soc_ops msm_tdm_be_ops = {
 	.hw_params = msm_tdm_snd_hw_params,
 };
 
+#if IS_ENABLED(CONFIG_SND_SOC_CS35L36_TDM)
+static int msm_sec_tdm_snd_startup(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai **codec_dais = rtd->codec_dais;
+	int i, ret;
+
+	ret = msm_tdm_snd_startup(substream);
+	if (ret < 0)
+		return ret;
+
+	for (i = 0; i < rtd->num_codecs; i++) {
+		ret = snd_soc_dai_set_fmt(codec_dais[i],
+					  SND_SOC_DAIFMT_DSP_A |
+					  SND_SOC_DAIFMT_CBS_CFS |
+					  SND_SOC_DAIFMT_IB_NF);
+		if (ret < 0)
+			return ret;
+
+		ret = snd_soc_dai_set_sysclk(codec_dais[i], 0,
+					     Q6AFE_LPASS_IBIT_CLK_12_P288_MHZ,
+					     SND_SOC_CLOCK_IN);
+		if (ret < 0) {
+			dev_err(codec_dais[i]->dev,
+				"Failed to set %s's clock: ret = %d\n",
+				codec_dais[i]->name, ret);
+			return ret;
+		}
+
+		ret = snd_soc_component_set_sysclk(codec_dais[i]->component,
+					0, 0, Q6AFE_LPASS_IBIT_CLK_12_P288_MHZ,
+					SND_SOC_CLOCK_IN);
+		if (ret < 0)
+			pr_err("%s: set sysclk failed, err:%d\n",
+			       __func__, ret);
+	}
+
+	return 0;
+}
+
+static struct snd_soc_ops msm_sec_tdm_be_ops = {
+	.startup = msm_sec_tdm_snd_startup,
+	.shutdown = msm_tdm_snd_shutdown,
+	.hw_params = msm_tdm_snd_hw_params,
+};
+#endif
+
 static struct snd_soc_ops msm_wcn_ops = {
 	.hw_params = msm_wcn_hw_params,
 };
@@ -1545,6 +1592,26 @@ struct snd_soc_dai_link_component dlc_tx2[] = {
 		.dai_name  = "msm_anlg_cdc_i2s_tx2",
 	},
 };
+
+#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
+static struct snd_soc_dai_link_component spk_codec[] = {
+	{
+		.name = "cs35l36.0-0041",
+		.dai_name = "cs35l36-pcm",
+	},
+	{
+		.name = "cs35l36.0-0040",
+		.dai_name = "cs35l36-pcm",
+	},
+};
+
+static struct snd_soc_codec_conf spk_codec_ch_conf[] = {
+	{
+		.dev_name = "cs35l36.0-0041",
+		.name_prefix = "R",
+	},
+};
+#endif
 
 /* Digital audio interface glue - connects codec <---> CPU */
 static struct snd_soc_dai_link msm_int_dai[] = {
@@ -2510,13 +2577,22 @@ static struct snd_soc_dai_link msm_int_be_dai[] = {
 		.stream_name = "Secondary TDM0 Playback",
 		.cpu_dai_name = "msm-dai-q6-tdm.36880",
 		.platform_name = "msm-pcm-routing",
+#if IS_ENABLED(CONFIG_SND_SOC_CS35L36_TDM)
+		.codecs = spk_codec,
+		.num_codecs = ARRAY_SIZE(spk_codec),
+#else
 		.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-rx",
+#endif
 		.no_pcm = 1,
 		.dpcm_playback = 1,
 		.id = MSM_BACKEND_DAI_SEC_TDM_RX_0,
 		.be_hw_params_fixup = msm_common_be_hw_params_fixup,
+#if IS_ENABLED(CONFIG_SND_SOC_CS35L36_TDM)
+		.ops = &msm_sec_tdm_be_ops,
+#else
 		.ops = &msm_tdm_be_ops,
+#endif
 		.ignore_suspend = 1,
 		.ignore_pmdown_time = 1,
 	},
@@ -2525,13 +2601,22 @@ static struct snd_soc_dai_link msm_int_be_dai[] = {
 		.stream_name = "Secondary TDM0 Capture",
 		.cpu_dai_name = "msm-dai-q6-tdm.36881",
 		.platform_name = "msm-pcm-routing",
+#if IS_ENABLED(CONFIG_SND_SOC_CS35L36_TDM)
+		.codecs = spk_codec,
+		.num_codecs = ARRAY_SIZE(spk_codec),
+#else
 		.codec_name = "msm-stub-codec.1",
 		.codec_dai_name = "msm-stub-tx",
+#endif
 		.no_pcm = 1,
 		.dpcm_capture = 1,
 		.id = MSM_BACKEND_DAI_SEC_TDM_TX_0,
 		.be_hw_params_fixup = msm_common_be_hw_params_fixup,
+#if IS_ENABLED(CONFIG_SND_SOC_CS35L36_TDM)
+		.ops = &msm_sec_tdm_be_ops,
+#else
 		.ops = &msm_tdm_be_ops,
+#endif
 		.ignore_suspend = 1,
 	},
 	{
@@ -3030,6 +3115,10 @@ static struct snd_soc_card sdm660_card = {
 	.dai_link	= msm_int_dai,
 	.num_links	= ARRAY_SIZE(msm_int_dai),
 	.late_probe	= msm_snd_card_late_probe,
+#if IS_ENABLED(CONFIG_SND_SOC_CS35L36)
+	.codec_conf	= spk_codec_ch_conf,
+	.num_configs	= ARRAY_SIZE(spk_codec_ch_conf),
+#endif
 };
 
 static void msm_disable_int_mclk0(struct work_struct *work)
