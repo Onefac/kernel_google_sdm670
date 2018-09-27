@@ -23,6 +23,9 @@
 #include <ipc/apr_tal.h>
 #include "adsp_err.h"
 #include "q6afecal-hwdep.h"
+#if defined(CONFIG_CIRRUS_SPKR_PROTECTION)
+#include <asoc/msm-cirrus-playback.h>
+#endif
 
 #define WAKELOCK_TIMEOUT	5000
 #define AFE_CLK_TOKEN	1024
@@ -1103,6 +1106,11 @@ static int32_t afe_callback(struct apr_client_data *data, void *priv)
 			av_dev_drift_afe_cb_handler(data->opcode, data->payload,
 						    data->payload_size);
 		} else {
+#if defined(CONFIG_CIRRUS_SPKR_PROTECTION)
+			if (!crus_afe_callback(data->payload,
+					       data->payload_size))
+				return 0;
+#endif
 			if (sp_make_afe_callback(data->opcode, data->payload,
 						 data->payload_size))
 				return -EINVAL;
@@ -1565,6 +1573,26 @@ static int afe_apr_send_pkt(void *data, wait_queue_head_t *wait)
 	mutex_unlock(&this_afe.afe_apr_lock);
 	return ret;
 }
+
+#if defined(CONFIG_CIRRUS_SPKR_PROTECTION)
+int afe_apr_send_pkt_crus(void *data, int index, int set)
+{
+	int ret = 0;
+
+	ret = afe_q6_interface_prepare();
+	if (ret != 0) {
+		pr_err("%s: Q6 interface prepare failed ret: %d\n",
+				__func__, ret);
+		return -EINVAL;
+	}
+
+	if (set)
+		return afe_apr_send_pkt(data, &this_afe.wait[index]);
+	else
+		return afe_apr_send_pkt(data, 0);
+}
+EXPORT_SYMBOL(afe_apr_send_pkt_crus);
+#endif
 /*
  * afe_apr_send_clk_pkt : returns 0 on success, negative otherwise.
  */
@@ -4047,6 +4075,10 @@ EXPORT_SYMBOL(afe_set_config);
 void afe_clear_config(enum afe_config_type config)
 {
 	clear_bit(config, &afe_configured_cmd);
+#if defined(CONFIG_CIRRUS_SPKR_PROTECTION)
+	if (config == AFE_CIRRUS_PORT_CONFIG)
+		msm_crus_check_set_setting(AFE_SSR);
+#endif
 }
 EXPORT_SYMBOL(afe_clear_config);
 

@@ -55,5 +55,18 @@ static inline void msm_dai_slim_exit(void)
 {
 };
 #endif
+
+#if IS_ENABLED(CONFIG_CIRRUS_SPKR_PROTECTION)
+int crus_sp_init(void);
+void crus_sp_exit(void);
+#else
+static inline int crus_sp_init(void)
+{
+	return 0;
+};
+static inline void crus_sp_exit(void)
+{
+};
+#endif
 #endif
 

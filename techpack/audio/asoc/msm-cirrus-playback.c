@@ -1795,7 +1795,7 @@ struct miscdevice crus_sp_misc = {
 	.fops = &crus_sp_fops,
 };
 
-static int __init crus_sp_init(void)
+int __init crus_sp_init(void)
 {
 	pr_info("CRUS_SP_INIT: initializing misc device\n");
 	atomic_set(&crus_sp_get_param_flag, 0);
@@ -1811,9 +1811,8 @@ static int __init crus_sp_init(void)
 
 	return platform_driver_register(&msm_cirrus_playback_driver);
 }
-module_init(crus_sp_init);
 
-static void __exit crus_sp_exit(void)
+void crus_sp_exit(void)
 {
 	int i = 0, j = 0;
 	mutex_destroy(&crus_sp_get_param_lock);
@@ -1825,4 +1824,3 @@ static void __exit crus_sp_exit(void)
 		}
 	platform_driver_unregister(&msm_cirrus_playback_driver);
 }
-module_exit(crus_sp_exit);

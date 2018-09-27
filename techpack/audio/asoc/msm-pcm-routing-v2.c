@@ -32,6 +32,9 @@
 #include <dsp/q6core.h>
 #include <dsp/q6common.h>
 #include <dsp/audio_cal_utils.h>
+#if defined(CONFIG_CIRRUS_SPKR_PROTECTION)
+#include <asoc/msm-cirrus-playback.h>
+#endif
 
 #include "msm-pcm-routing-v2.h"
 #include "msm-pcm-routing-devdep.h"
@@ -31577,6 +31580,10 @@ static int msm_routing_probe(struct snd_soc_component *component)
 	snd_soc_add_component_controls(component,
 		msm_routing_be_dai_name_table_mixer_controls,
 		ARRAY_SIZE(msm_routing_be_dai_name_table_mixer_controls));
+
+#if defined(CONFIG_CIRRUS_SPKR_PROTECTION)
+	msm_crus_pb_add_controls(component);
+#endif
 
 	/* Add doa control based on config */
 	msm_routing_add_doa_control(component);
