@@ -1996,9 +1996,6 @@ static const unsigned int usbpd_extcon_cable[] = {
 	EXTCON_NONE,
 };
 
-/* EXTCON_USB and EXTCON_USB_HOST are mutually exclusive */
-static const u32 usbpd_extcon_exclusive[] = {0x3, 0};
-
 static void usbpd_release(struct device *dev)
 {
 	struct usbpd *pd = container_of(dev, struct usbpd, dev);
@@ -2084,7 +2081,6 @@ struct usbpd *usbpd_create(struct device *parent)
 		goto exit_debugfs;
 	}
 
-	pd->extcon->mutually_exclusive = usbpd_extcon_exclusive;
 	ret = devm_extcon_dev_register(parent, pd->extcon);
 	if (ret < 0) {
 		logbuffer_log(pd->log, "failed to register extcon device");
