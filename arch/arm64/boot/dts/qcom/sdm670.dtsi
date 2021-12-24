@@ -2087,6 +2087,7 @@
 			<143 777 0 355>; /* IB defined for IPA clk in MHz*/
 		qcom,bus-vector-names =
 			"MIN", "SVS2", "SVS", "NOMINAL", "TURBO";
+		qcom,throughput-threshold = <310 600 1000>;
 
 		/* IPA RAM mmap */
 		qcom,ipa-ram-mmap = <
