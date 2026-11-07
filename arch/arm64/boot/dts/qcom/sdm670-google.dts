@@ -123,3 +123,12 @@
 		qcom,pre-scaling = <1 1>;
 	};
 };
+
+/*
+ * The vibrator is a TI DRV2624 on I2C. The overlays disable the PMIC
+ * haptics through its msm-4.9 node name (qcom,haptics@c000), which misses
+ * this tree's qcom,haptic@c000, so turn it off here.
+ */
+&pm660_haptics {
+	status = "disabled";
+};
