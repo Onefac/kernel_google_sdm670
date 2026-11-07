@@ -49,6 +49,7 @@ struct nqx_dev {
 	wait_queue_head_t	cold_reset_read_wq;
 	struct	mutex		read_mutex;
 	struct	mutex		dev_ref_mutex;
+	struct	mutex		ese_status_mutex;
 	struct	i2c_client	*client;
 	dev_t			devno;
 	struct class		*nqx_class;
@@ -61,6 +62,9 @@ struct nqx_dev {
 	unsigned int		firm_gpio;
 	unsigned int		clkreq_gpio;
 	unsigned int		ese_gpio;
+	/* ese usage and gpio information */
+	unsigned int		ese_gpio_stored;
+	bool			ese_in_use; /* protected by ese_status_mutex */
 	/* NFC VEN pin state powered by Nfc */
 	bool			nfc_ven_enabled;
 	/* NFC state reflected from MW */
@@ -109,6 +113,7 @@ unsigned int	disable_ctrl;
 static void nqx_init_stat(struct nqx_dev *nqx_dev)
 {
 	nqx_dev->count_irq = 0;
+	nqx_dev->ese_gpio_stored = 0;
 }
 
 static void nqx_disable_irq(struct nqx_dev *nqx_dev)
@@ -523,6 +528,36 @@ static int sn100_ese_pwr(struct nqx_dev *nqx_dev, unsigned long arg)
 	return r;
 }
 
+/* Callback to indicate if secure element is in use.
+ * @claim: true/false indicating claim/release
+ *
+ * returns 0 in case request was successful, otherwise -EBUSY if ese was
+ * forced low due to firmware download mode.
+ */
+int nqx_claim_ese(struct nqx_dev *nqx_dev, bool claim)
+{
+	mutex_lock(&nqx_dev->ese_status_mutex);
+	if (claim) {
+		/* currently in download mode,
+		 * we cannot start an ese transaction
+		 */
+		if (gpio_is_valid(nqx_dev->firm_gpio) &&
+				gpio_get_value(nqx_dev->firm_gpio)) {
+			dev_err(&nqx_dev->client->dev, "%s: claim ese failed\n",
+					__func__);
+			mutex_unlock(&nqx_dev->ese_status_mutex);
+			return -EBUSY;
+		}
+		dev_dbg(&nqx_dev->client->dev, "%s: ese claimed\n", __func__);
+		nqx_dev->ese_in_use = true;
+	} else {
+		dev_dbg(&nqx_dev->client->dev, "%s: ese released\n", __func__);
+		nqx_dev->ese_in_use = false;
+	}
+	mutex_unlock(&nqx_dev->ese_status_mutex);
+	return 0;
+}
+
 /*
  * Power management of the eSE
  * NFC & eSE ON : NFC_EN high and eSE_pwr_req high.
@@ -836,10 +871,23 @@ int nfc_ioctl_power_states(struct file *filp, unsigned long arg)
 		dev_dbg(&nqx_dev->client->dev,
 			"gpio_set_value disable: %s: info: %p\n",
 			__func__, nqx_dev);
-		if (gpio_is_valid(nqx_dev->firm_gpio)) {
+		mutex_lock(&nqx_dev->ese_status_mutex);
+		if (gpio_is_valid(nqx_dev->firm_gpio) &&
+				gpio_get_value(nqx_dev->firm_gpio)) {
+			if (gpio_is_valid(nqx_dev->ese_gpio) &&
+					gpio_get_value(nqx_dev->ese_gpio) !=
+					nqx_dev->ese_gpio_stored) {
+				dev_dbg(&nqx_dev->client->dev,
+						"%s: Restoring ese state %d\n",
+						__func__,
+						nqx_dev->ese_gpio_stored);
+				gpio_set_value(nqx_dev->ese_gpio,
+						nqx_dev->ese_gpio_stored);
+			}
 			gpio_set_value(nqx_dev->firm_gpio, 0);
 			usleep_range(10000, 10100);
 		}
+		mutex_unlock(&nqx_dev->ese_status_mutex);
 
 		if (gpio_is_valid(nqx_dev->ese_gpio)) {
 			if (!gpio_get_value(nqx_dev->ese_gpio)) {
@@ -882,13 +930,24 @@ int nfc_ioctl_power_states(struct file *filp, unsigned long arg)
 		 * We are switching to Dowload Mode, toggle the enable pin
 		 * in order to set the NFCC in the new mode
 		 */
+		mutex_lock(&nqx_dev->ese_status_mutex);
 		if (gpio_is_valid(nqx_dev->ese_gpio)) {
-			if (gpio_get_value(nqx_dev->ese_gpio)) {
+			if (nqx_dev->ese_in_use) {
 				dev_err(&nqx_dev->client->dev,
-				"FW download forbidden while ese is on\n");
+					"FW download forbidden while ese is in use\n");
+				mutex_unlock(&nqx_dev->ese_status_mutex);
 				return -EBUSY; /* Device or resource busy */
 			}
+			nqx_dev->ese_gpio_stored =
+				gpio_get_value(nqx_dev->ese_gpio);
+			dev_dbg(&nqx_dev->client->dev,
+				"FW download backing up se state: %d\n",
+				nqx_dev->ese_gpio_stored);
+			if (nqx_dev->ese_gpio_stored == 1)
+				gpio_set_value(nqx_dev->ese_gpio, 0);
 		}
+		mutex_unlock(&nqx_dev->ese_status_mutex);
+
 		gpio_set_value(nqx_dev->en_gpio, 1);
 		usleep_range(10000, 10100);
 		if (gpio_is_valid(nqx_dev->firm_gpio)) {
@@ -1690,6 +1749,7 @@ static int nqx_probe(struct i2c_client *client,
 	init_waitqueue_head(&nqx_dev->cold_reset_read_wq);
 	mutex_init(&nqx_dev->read_mutex);
 	mutex_init(&nqx_dev->dev_ref_mutex);
+	mutex_init(&nqx_dev->ese_status_mutex);
 	spin_lock_init(&nqx_dev->irq_enabled_lock);
 
 	r = alloc_chrdev_region(&nqx_dev->devno, 0, DEV_COUNT, DEVICE_NAME);
