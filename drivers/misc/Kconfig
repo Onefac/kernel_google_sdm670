@@ -649,6 +649,17 @@ source "drivers/misc/fpr_FingerprintCard/Kconfig"
 source "drivers/misc/qrc/Kconfig"
 endmenu
 
+config CITADEL
+	tristate "Google Citadel"
+	depends on SPI
+	---help---
+	  Say Y here if you have a Citadel security microcontroller from Google Inc.
+	  It will be accessible using a TPM-style transport interface from within
+	  Linux.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called citadel-spi.
+
 config OKL4_USER_VIPC
 	bool "OKL4 Virtual Platform IPC Driver"
 	depends on OKL4_GUEST
