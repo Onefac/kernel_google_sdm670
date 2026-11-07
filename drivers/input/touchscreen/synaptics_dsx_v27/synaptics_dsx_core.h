@@ -45,7 +45,7 @@
 #include <linux/fb.h>
 #endif
 #ifdef CONFIG_DRM
-#include <linux/msm_drm_notify.h>
+#include <drm/drm_panel.h>
 #endif
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
@@ -424,6 +424,7 @@ struct synaptics_rmi4_data {
 	struct pm_qos_request pm_qos_req;
 #ifdef CONFIG_DRM
 	struct notifier_block drm_notifier;
+	struct drm_panel *panel;
 #endif
 #ifdef CONFIG_FB
 	struct notifier_block fb_notifier;
