@@ -39,6 +39,7 @@
 #include <linux/input.h>
 #include <linux/gpio.h>
 #include <linux/platform_device.h>
+#include <linux/of.h>
 #include <linux/regulator/consumer.h>
 #include <linux/input/synaptics_dsx_v27.h>
 #include "synaptics_dsx_core.h"
@@ -4766,6 +4767,40 @@ exit:
 }
 EXPORT_SYMBOL(synaptics_rmi4_new_function);
 
+#ifdef CONFIG_DRM
+/*
+ * The display driver reports blanking per panel, through the notifier of
+ * the drm_panel. Like the CAF Synaptics driver, take the candidate panels
+ * from the "panel" phandle list of the touch controller node and use the
+ * one that has registered. Without that property, run without blank
+ * notifications rather than fail.
+ */
+static struct drm_panel *synaptics_rmi4_find_panel(struct device *dev)
+{
+	struct device_node *np = dev->parent ? dev->parent->of_node : NULL;
+	struct device_node *node;
+	struct drm_panel *panel;
+	int i, count;
+
+	if (!np)
+		return NULL;
+
+	count = of_count_phandle_with_args(np, "panel", NULL);
+	if (count <= 0)
+		return NULL;
+
+	for (i = 0; i < count; i++) {
+		node = of_parse_phandle(np, "panel", i);
+		panel = of_drm_find_panel(node);
+		of_node_put(node);
+		if (!IS_ERR(panel))
+			return panel;
+	}
+
+	return ERR_PTR(-EPROBE_DEFER);
+}
+#endif
+
 static int synaptics_rmi4_probe(struct platform_device *pdev)
 {
 	int retval;
@@ -4773,6 +4808,9 @@ static int synaptics_rmi4_probe(struct platform_device *pdev)
 	struct synaptics_rmi4_data *rmi4_data;
 	const struct synaptics_dsx_hw_interface *hw_if;
 	const struct synaptics_dsx_board_data *bdata;
+#ifdef CONFIG_DRM
+	struct drm_panel *panel;
+#endif
 
 	hw_if = pdev->dev.platform_data;
 	if (!hw_if) {
@@ -4790,6 +4828,16 @@ static int synaptics_rmi4_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+#ifdef CONFIG_DRM
+	panel = synaptics_rmi4_find_panel(&pdev->dev);
+	if (IS_ERR(panel))
+		return PTR_ERR(panel);
+	if (!panel)
+		dev_warn(&pdev->dev,
+				"%s: No panel, display blanking will not be tracked\n",
+				__func__);
+#endif
+
 	rmi4_data = kzalloc(sizeof(*rmi4_data), GFP_KERNEL);
 	if (!rmi4_data) {
 		dev_err(&pdev->dev,
@@ -4799,6 +4847,9 @@ static int synaptics_rmi4_probe(struct platform_device *pdev)
 	}
 
 	rmi4_data->pdev = pdev;
+#ifdef CONFIG_DRM
+	rmi4_data->panel = panel;
+#endif
 	rmi4_data->current_page = MASK_8BIT;
 	rmi4_data->hw_if = hw_if;
 	rmi4_data->suspend = false;
@@ -4879,11 +4930,14 @@ static int synaptics_rmi4_probe(struct platform_device *pdev)
 #ifdef CONFIG_DRM
 	rmi4_data->drm_notifier.notifier_call =
 			synaptics_rmi4_dsi_panel_notifier_cb;
-	retval = msm_drm_register_client(&rmi4_data->drm_notifier);
-	if (retval < 0) {
-		dev_err(&pdev->dev,
-				"%s: Failed to register drm notifier client\n",
-				__func__);
+	if (rmi4_data->panel) {
+		retval = drm_panel_notifier_register(rmi4_data->panel,
+				&rmi4_data->drm_notifier);
+		if (retval < 0) {
+			dev_err(&pdev->dev,
+					"%s: Failed to register drm notifier client\n",
+					__func__);
+		}
 	}
 #endif
 
@@ -5000,7 +5054,9 @@ err_enable_irq:
 	pm_qos_remove_request(&rmi4_data->pm_qos_req);
 
 #ifdef CONFIG_DRM
-	msm_drm_unregister_client(&rmi4_data->drm_notifier);
+	if (rmi4_data->panel)
+		drm_panel_notifier_unregister(rmi4_data->panel,
+				&rmi4_data->drm_notifier);
 #endif
 #ifdef CONFIG_FB
 	fb_unregister_client(&rmi4_data->fb_notifier);
@@ -5083,7 +5139,9 @@ static int synaptics_rmi4_remove(struct platform_device *pdev)
 	pm_qos_remove_request(&rmi4_data->pm_qos_req);
 
 #ifdef CONFIG_DRM
-	msm_drm_unregister_client(&rmi4_data->drm_notifier);
+	if (rmi4_data->panel)
+		drm_panel_notifier_unregister(rmi4_data->panel,
+				&rmi4_data->drm_notifier);
 #endif
 
 #ifdef CONFIG_FB
@@ -5130,31 +5188,28 @@ static int synaptics_rmi4_dsi_panel_notifier_cb(struct notifier_block *self,
 		unsigned long event, void *data)
 {
 	int transition;
-	struct msm_drm_notifier *evdata = data;
+	struct drm_panel_notifier *evdata = data;
 	struct synaptics_rmi4_data *rmi4_data =
 			container_of(self, struct synaptics_rmi4_data,
 			drm_notifier);
 
-	if (!evdata || (evdata->id != 0))
-		return 0;
-
 	if (evdata && evdata->data && rmi4_data) {
-		if (event == MSM_DRM_EVENT_BLANK) {
+		if (event == DRM_PANEL_EVENT_BLANK) {
 			transition = *(int *)evdata->data;
 			pr_info("%s: DRM blank %d, event %ld\n",
 					__func__, transition, event);
-			if (transition == MSM_DRM_BLANK_UNBLANK) {
+			if (transition == DRM_PANEL_BLANK_UNBLANK) {
 				mutex_lock(&(rmi4_data->rmi4_pm_mutex));
 				synaptics_rmi4_resume(&rmi4_data->pdev->dev);
 				mutex_unlock(&(rmi4_data->rmi4_pm_mutex));
 				rmi4_data->fb_ready = true;
 			}
-		} else if (event == MSM_DRM_EARLY_EVENT_BLANK) {
+		} else if (event == DRM_PANEL_EARLY_EVENT_BLANK) {
 			transition = *(int *)evdata->data;
 			pr_info("%s: DRM blank %d, event %ld\n",
 					__func__, transition, event);
-			if (transition == MSM_DRM_BLANK_POWERDOWN ||
-					transition == MSM_DRM_BLANK_LP) {
+			if (transition == DRM_PANEL_BLANK_POWERDOWN ||
+					transition == DRM_PANEL_BLANK_LP) {
 				mutex_lock(&(rmi4_data->rmi4_pm_mutex));
 				synaptics_rmi4_suspend(&rmi4_data->pdev->dev);
 				mutex_unlock(&(rmi4_data->rmi4_pm_mutex));
