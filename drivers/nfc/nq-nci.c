@@ -1733,9 +1733,9 @@ static int nqx_probe(struct i2c_client *client,
 			goto err_clkreq_gpio;
 		}
 	} else {
-		dev_err(&client->dev,
+		/* clkreq gpio is optional, e.g. with a crystal-clocked NFCC */
+		dev_info(&client->dev,
 			"%s: clkreq gpio not provided\n", __func__);
-		goto err_ese_gpio;
 	}
 
 	nqx_dev->en_gpio = platform_data->en_gpio;
@@ -1867,7 +1867,8 @@ err_class_create:
 err_char_dev_register:
 	mutex_destroy(&nqx_dev->read_mutex);
 err_clkreq_gpio:
-	gpio_free(platform_data->clkreq_gpio);
+	if (gpio_is_valid(platform_data->clkreq_gpio))
+		gpio_free(platform_data->clkreq_gpio);
 err_ese_gpio:
 	/* optional gpio, not sure was configured in probe */
 	if (gpio_is_valid(platform_data->ese_gpio))
@@ -1920,7 +1921,8 @@ static int nqx_remove(struct i2c_client *client)
 	unregister_chrdev_region(nqx_dev->devno, DEV_COUNT);
 	mutex_destroy(&nqx_dev->read_mutex);
 	mutex_destroy(&nqx_dev->dev_ref_mutex);
-	gpio_free(nqx_dev->clkreq_gpio);
+	if (gpio_is_valid(nqx_dev->clkreq_gpio))
+		gpio_free(nqx_dev->clkreq_gpio);
 	/* optional gpio, not sure was configured in probe */
 	if (nqx_dev->ese_gpio > 0)
 		gpio_free(nqx_dev->ese_gpio);
