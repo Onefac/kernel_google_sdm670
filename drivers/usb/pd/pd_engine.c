@@ -16,6 +16,7 @@
 #include <linux/device.h>
 #include <linux/delay.h>
 #include <linux/extcon.h>
+#include <linux/extcon-provider.h>
 #include <linux/jiffies.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -624,7 +625,7 @@ err:
 static void update_src_caps(struct work_struct *work)
 {
 	struct usbpd *pd = container_of(work, struct usbpd, update_pdo_work);
-	struct tcpc_config *config = pd->tcpc_dev.config;
+	const struct tcpc_config *config = pd->tcpc_dev.config;
 	u32 pdo[1];
 
 	if (pd->wireless_online && pd->default_src_cap) {
@@ -1856,26 +1857,26 @@ static int init_tcpc_config(struct tcpc_dev *pd_tcpc_dev)
 	struct usbpd *pd = container_of(pd_tcpc_dev, struct usbpd, tcpc_dev);
 	struct device *dev = &pd->dev;
 	struct tcpc_config *config;
+	u32 val;
 	int ret;
 
-	pd_tcpc_dev->config = devm_kzalloc(dev, sizeof(*config), GFP_KERNEL);
-	if (!pd_tcpc_dev->config)
+	config = devm_kzalloc(dev, sizeof(*config), GFP_KERNEL);
+	if (!config)
 		return -ENOMEM;
 
-	config = pd_tcpc_dev->config;
-
-	ret = device_property_read_u32(dev->parent, "goog,port-type",
-				       &config->type);
+	ret = device_property_read_u32(dev->parent, "goog,port-type", &val);
 	if (ret < 0)
 		return ret;
+	config->type = val;
+	config->data = TYPEC_PORT_DRD;
 
 	switch (config->type) {
-	case TYPEC_PORT_UFP:
+	case TYPEC_PORT_SNK:
 		config->snk_pdo = parse_pdo(pd, SNK_PDO, &config->nr_snk_pdo);
 		if (IS_ERR(config->snk_pdo))
 			return PTR_ERR(config->snk_pdo);
 		break;
-	case TYPEC_PORT_DFP:
+	case TYPEC_PORT_SRC:
 		config->src_pdo = parse_pdo(pd, SRC_PDO, &config->nr_src_pdo);
 		if (IS_ERR(config->src_pdo))
 			return PTR_ERR(config->src_pdo);
@@ -1889,9 +1890,10 @@ static int init_tcpc_config(struct tcpc_dev *pd_tcpc_dev)
 			return PTR_ERR(config->src_pdo);
 
 		ret = device_property_read_u32(dev->parent, "goog,default-role",
-					       &config->default_role);
+					       &val);
 		if (ret < 0)
 			return ret;
+		config->default_role = val;
 
 		config->try_role_hw = device_property_read_bool(
 							dev->parent,
@@ -1901,13 +1903,7 @@ static int init_tcpc_config(struct tcpc_dev *pd_tcpc_dev)
 		return -EINVAL;
 	}
 
-	if (config->type == TYPEC_PORT_UFP || config->type == TYPEC_PORT_DRP) {
-		ret = device_property_read_u32(dev->parent, "goog,max-snk-mv",
-					       &config->max_snk_mv);
-		ret = device_property_read_u32(dev->parent, "goog,max-snk-ma",
-					       &config->max_snk_ma);
-		ret = device_property_read_u32(dev->parent, "goog,max-snk-mw",
-					       &config->max_snk_mw);
+	if (config->type == TYPEC_PORT_SNK || config->type == TYPEC_PORT_DRP) {
 		ret = device_property_read_u32(dev->parent, "goog,op-snk-mw",
 					       &config->operating_snk_mw);
 		if (ret < 0)
@@ -1917,6 +1913,8 @@ static int init_tcpc_config(struct tcpc_dev *pd_tcpc_dev)
 	/* TODO: parse alt mode from DT */
 	config->alt_modes = NULL;
 	config->self_powered = true;
+
+	pd_tcpc_dev->config = config;
 
 	return 0;
 }
@@ -1947,7 +1945,6 @@ static int init_tcpc_dev(struct tcpc_dev *pd_tcpc_dev)
 	pd_tcpc_dev->log_rtc = log_rtc;
 	pd_tcpc_dev->set_suspend_supported = tcpm_set_suspend_supported;
 	pd_tcpc_dev->in_pd_contract = tcpm_in_pd_contract;
-	pd_tcpc_dev->mux = NULL;
 	return 0;
 }
 
