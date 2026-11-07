@@ -183,11 +183,6 @@ struct logbuffer *debugfs_logbuffer_register(char *name)
 	struct logbuffer *instance;
 	unsigned long flags;
 
-	if (IS_ERR_OR_NULL(rootdir)) {
-		pr_err("rootdir not found\n");
-		return ERR_PTR(-EINVAL);
-	}
-
 	instance = kzalloc(sizeof(struct logbuffer), GFP_KERNEL);
 	if (!instance) {
 		pr_err("failed to create instance %s\n", name);
@@ -197,18 +192,13 @@ struct logbuffer *debugfs_logbuffer_register(char *name)
 	instance->buffer = vzalloc(LOG_BUFFER_ENTRIES * LOG_BUFFER_ENTRY_SIZE);
 	if (!instance->buffer) {
 		pr_err("failed to create buffer %s\n", name);
-		instance = ERR_PTR(-ENOMEM);
 		goto free_instance;
 	}
 
-	instance->file = debugfs_create_file(name,
+	if (!IS_ERR_OR_NULL(rootdir))
+		instance->file = debugfs_create_file(name,
 				0444, rootdir, instance,
 				&logbuffer_debug_operations);
-	if (IS_ERR_OR_NULL(instance->file)) {
-		pr_err("Failed to create debugfs file:%s err:%ld\n", name,
-		       PTR_ERR(instance->file));
-		goto free_buffer;
-	}
 
 	strlcpy(instance->id, name, sizeof(instance->id));
 
@@ -221,8 +211,6 @@ struct logbuffer *debugfs_logbuffer_register(char *name)
 	pr_info(" id:%s registered\n", name);
 	return instance;
 
-free_buffer:
-	vfree(instance->buffer);
 free_instance:
 	kfree(instance);
 
@@ -264,10 +252,6 @@ static int __init logbuffer_debugfs_init(void)
 	spin_lock_init(&instances_lock);
 
 	rootdir = debugfs_create_dir("logbuffer", NULL);
-	if (IS_ERR_OR_NULL(rootdir)) {
-		pr_err("Unable to create rootdir %ld\n", PTR_ERR(rootdir));
-		return PTR_ERR(rootdir);
-	}
 
 	register_syscore_ops(&logbuffer_ops);
 
