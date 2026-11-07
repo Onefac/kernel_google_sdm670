@@ -129,7 +129,7 @@ struct chg_drv {
 
 	struct delayed_work init_work;
 	struct delayed_work chg_work;
-	struct wakeup_source chg_ws;
+	struct wakeup_source *chg_ws;
 
 	bool stop_charging;
 	int temp_idx;
@@ -148,7 +148,7 @@ struct chg_drv {
 
 	struct mutex bd_lock;
 	struct bd_data bd_state;
-	struct wakeup_source bd_ws;
+	struct wakeup_source *bd_ws;
 
 	bool overheat;			/* battery reports overheat */
 	bool freeze_soc;		/* battery soc freeze & thaw */
@@ -463,9 +463,9 @@ static void chg_update_charging_state(struct chg_drv *chg_drv,
 		chg_vote_input_suspend(chg_drv, MSC_CHG_VOTER, disable_pwrsrc);
 		/* take a wakelock */
 		if (disable_pwrsrc)
-			__pm_stay_awake(&chg_drv->bd_ws);
+			__pm_stay_awake(chg_drv->bd_ws);
 		else
-			__pm_relax(&chg_drv->bd_ws);
+			__pm_relax(chg_drv->bd_ws);
 
 	}
 	chg_drv->disable_pwrsrc = disable_pwrsrc;
@@ -733,7 +733,7 @@ static void bd_work(struct work_struct *work)
 	const long long delta_time = now - bd_state->disconnect_time;
 	int ret, soc = 0;
 
-	__pm_stay_awake(&chg_drv->bd_ws);
+	__pm_stay_awake(chg_drv->bd_ws);
 
 	mutex_lock(&chg_drv->bd_lock);
 
@@ -799,7 +799,7 @@ bd_rerun:
 
 bd_done:
 	mutex_unlock(&chg_drv->bd_lock);
-	__pm_relax(&chg_drv->bd_ws);
+	__pm_relax(chg_drv->bd_ws);
 }
 
 static void chg_work(struct work_struct *work)
@@ -824,7 +824,7 @@ static void chg_work(struct work_struct *work)
 	static bool cable_in;
 	bool plug_status_changed = false;
 
-	__pm_stay_awake(&chg_drv->chg_ws);
+	__pm_stay_awake(chg_drv->chg_ws);
 	pr_debug("battery charging work item\n");
 
 	usb_present = PSY_GET_PROP(usb_psy, POWER_SUPPLY_PROP_PRESENT);
@@ -883,7 +883,7 @@ static void chg_work(struct work_struct *work)
 
 		/* allow sleep (if disconnected) while draining */
 		if (chg_drv->disable_pwrsrc)
-			__pm_relax(&chg_drv->bd_ws);
+			__pm_relax(chg_drv->bd_ws);
 
 		goto exit_chg_work;
 	} else if (chg_drv->stop_charging && plugged) {
@@ -1365,7 +1365,7 @@ error_rerun:
 			      msecs_to_jiffies(CHG_WORK_ERROR_RETRY_MS));
 
 exit_chg_work:
-	__pm_relax(&chg_drv->chg_ws);
+	__pm_relax(chg_drv->chg_ws);
 }
 
 static void dump_profile(struct chg_profile *profile)
@@ -2327,11 +2327,11 @@ static void google_charger_init_work(struct work_struct *work)
 	if (ret < 0)
 		pr_err("Cannot register power supply notifer, ret=%d\n", ret);
 
-	wakeup_source_init(&chg_drv->chg_ws, "google-charger");
+	chg_drv->chg_ws = wakeup_source_register(NULL, "google-charger");
 	pr_info("google_charger_init_work done\n");
 
 	mutex_init(&chg_drv->bd_lock);
-	wakeup_source_init(&chg_drv->bd_ws, "defender");
+	chg_drv->bd_ws = wakeup_source_register(NULL, "defender");
 	INIT_DELAYED_WORK(&chg_drv->bd_work, bd_work);
 	bd_init(&chg_drv->bd_state, chg_drv->device);
 
@@ -2545,8 +2545,8 @@ static int google_charger_remove(struct platform_device *pdev)
 			power_supply_put(chg_drv->usb_psy);
 		if (chg_drv->wlc_psy)
 			power_supply_put(chg_drv->wlc_psy);
-		wakeup_source_trash(&chg_drv->bd_ws);
-		wakeup_source_trash(&chg_drv->chg_ws);
+		wakeup_source_unregister(chg_drv->bd_ws);
+		wakeup_source_unregister(chg_drv->chg_ws);
 	}
 
 	return 0;
