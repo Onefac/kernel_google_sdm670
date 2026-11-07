@@ -562,13 +562,15 @@ int nqx_ese_pwr(struct nqx_dev *nqx_dev, unsigned long arg)
 				usleep_range(1000, 1100);
 			}
 			gpio_set_value(nqx_dev->ese_gpio, 1);
-			usleep_range(1000, 1100);
+			/* hardware dependent delay */
+			usleep_range(5000, 5100);
 			if (gpio_get_value(nqx_dev->ese_gpio)) {
 				dev_dbg(&nqx_dev->client->dev, "ese_gpio is enabled\n");
 				r = 0;
 			}
 		}
 	} else if (arg == 1) {
+		r = 0;
 		if (nqx_dev->nfc_ven_enabled &&
 			((nqx_dev->nqx_info.info.chip_type == NFCC_NQ_220) ||
 			(nqx_dev->nqx_info.info.chip_type == NFCC_PN66T))) {
