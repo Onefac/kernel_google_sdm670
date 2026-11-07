@@ -88,3 +88,38 @@
 		};
 	};
 };
+
+/*
+ * The Pixel overlays relabel these pm660 VADC channels through their
+ * msm-4.9 node names: give them those names so that the overlay updates
+ * them instead of adding reg-less duplicates.
+ */
+&pm660_vadc {
+	/delete-node/ msm_therm;
+	/delete-node/ emmc_therm;
+	/delete-node/ quiet_therm;
+
+	chan@4d {
+		reg = <ADC_AMUX_THM1_PU2>;
+		label = "msm_therm";
+		qcom,ratiometric;
+		qcom,hw-settle-time = <200>;
+		qcom,pre-scaling = <1 1>;
+	};
+
+	chan@4e {
+		reg = <ADC_AMUX_THM2_PU2>;
+		label = "emmc_therm";
+		qcom,ratiometric;
+		qcom,hw-settle-time = <200>;
+		qcom,pre-scaling = <1 1>;
+	};
+
+	chan@51 {
+		reg = <ADC_AMUX_THM5_PU2>;
+		label = "quiet_therm";
+		qcom,ratiometric;
+		qcom,hw-settle-time = <200>;
+		qcom,pre-scaling = <1 1>;
+	};
+};
