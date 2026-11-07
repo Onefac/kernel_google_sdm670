@@ -96,6 +96,22 @@ enum qusb_phy_reg {
 	USB2_PHY_REG_MAX,
 };
 
+/* Register offset layout of the msm-4.9 binding */
+enum qusb_phy_legacy_reg {
+	LEGACY_PORT_TUNE1,
+	LEGACY_PLL_COMMON_STATUS_ONE,
+	LEGACY_PWR_CTRL1,
+	LEGACY_INTR_CTRL,
+	LEGACY_PLL_CORE_INPUT_OVERRIDE,
+	LEGACY_TEST1,
+	LEGACY_BIAS_CTRL_1,
+	LEGACY_BIAS_CTRL_2,
+	LEGACY_SQ_CTRL1,
+	LEGACY_SQ_CTRL2,
+	LEGACY_DEBUG_CTRL1,
+	LEGACY_USB2_PHY_REG_MAX,
+};
+
 struct qusb_phy {
 	struct usb_phy		phy;
 	struct mutex		lock;
@@ -1092,6 +1108,43 @@ static int qusb2_get_regulators(struct qusb_phy *qphy)
 	return 0;
 }
 
+/* DEBUG_CTRL2..4 and STAT5 sit at fixed offsets from DEBUG_CTRL1 */
+static int qusb_phy_parse_legacy_reg_offset(struct qusb_phy *qphy)
+{
+	struct device *dev = qphy->phy.dev;
+	u32 legacy[LEGACY_USB2_PHY_REG_MAX];
+	int ret;
+
+	ret = of_property_read_u32_array(dev->of_node,
+			"qcom,qusb-phy-reg-offset", legacy, ARRAY_SIZE(legacy));
+	if (ret)
+		return ret;
+
+	qphy->phy_reg = devm_kcalloc(dev, USB2_PHY_REG_MAX,
+				     sizeof(*qphy->phy_reg), GFP_KERNEL);
+	if (!qphy->phy_reg)
+		return -ENOMEM;
+	qphy->qusb_phy_reg_offset_cnt = USB2_PHY_REG_MAX;
+
+	qphy->phy_reg[PORT_TUNE1] = legacy[LEGACY_PORT_TUNE1];
+	qphy->phy_reg[PLL_COMMON_STATUS_ONE] =
+				legacy[LEGACY_PLL_COMMON_STATUS_ONE];
+	qphy->phy_reg[PWR_CTRL1] = legacy[LEGACY_PWR_CTRL1];
+	qphy->phy_reg[INTR_CTRL] = legacy[LEGACY_INTR_CTRL];
+	qphy->phy_reg[PLL_CORE_INPUT_OVERRIDE] =
+				legacy[LEGACY_PLL_CORE_INPUT_OVERRIDE];
+	qphy->phy_reg[TEST1] = legacy[LEGACY_TEST1];
+	qphy->phy_reg[BIAS_CTRL_2] = legacy[LEGACY_BIAS_CTRL_2];
+	qphy->phy_reg[DEBUG_CTRL1] = legacy[LEGACY_DEBUG_CTRL1];
+	qphy->phy_reg[DEBUG_CTRL2] = legacy[LEGACY_DEBUG_CTRL1] + 0x04;
+	qphy->phy_reg[DEBUG_CTRL3] = legacy[LEGACY_DEBUG_CTRL1] + 0x08;
+	qphy->phy_reg[DEBUG_CTRL4] = legacy[LEGACY_DEBUG_CTRL1] + 0x0c;
+	qphy->phy_reg[STAT5] = legacy[LEGACY_DEBUG_CTRL1] + 0x24;
+
+	dev_info(dev, "converted legacy 11-entry qusb-phy-reg-offset\n");
+	return 0;
+}
+
 static int qusb_phy_probe(struct platform_device *pdev)
 {
 	struct qusb_phy *qphy;
@@ -1271,7 +1324,11 @@ static int qusb_phy_probe(struct platform_device *pdev)
 
 	size = 0;
 	of_get_property(dev->of_node, "qcom,qusb-phy-reg-offset", &size);
-	if (size) {
+	if (size == LEGACY_USB2_PHY_REG_MAX * sizeof(u32)) {
+		ret = qusb_phy_parse_legacy_reg_offset(qphy);
+		if (ret)
+			return ret;
+	} else if (size) {
 		qphy->phy_reg = devm_kzalloc(dev, size, GFP_KERNEL);
 		if (qphy->phy_reg) {
 			qphy->qusb_phy_reg_offset_cnt =
