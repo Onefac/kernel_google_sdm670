@@ -529,7 +529,7 @@ static int sn100_ese_pwr(struct nqx_dev *nqx_dev, unsigned long arg)
  * NFC OFF & eSE ON : NFC_EN high and eSE_pwr_req high.
  * NFC OFF & eSE OFF : NFC_EN low and eSE_pwr_req low.
  */
-static int nqx_ese_pwr(struct nqx_dev *nqx_dev, unsigned long arg)
+int nqx_ese_pwr(struct nqx_dev *nqx_dev, unsigned long arg)
 {
 	int r = -1;
 	const unsigned char svdd_off_cmd_warn[] =  {0x2F, 0x31, 0x01, 0x01};
