@@ -885,6 +885,17 @@ config INPUT_SC27XX_VIBRA
 	  To compile this driver as a module, choose M here. The module will
 	  be called sc27xx_vibra.
 
+config INPUT_DRV2624_HAPTICS
+	tristate "TI DRV2624 haptics support"
+	depends on INPUT && I2C
+	select INPUT_FF_MEMLESS
+	select REGMAP_I2C
+	help
+	  Say Y to enable support for the TI DRV2624 haptics driver.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called drv2624-haptics.
+
 source "drivers/input/misc/fpc_fingerprint/Kconfig"
 
 endif
