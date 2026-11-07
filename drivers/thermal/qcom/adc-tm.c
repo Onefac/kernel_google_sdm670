@@ -270,6 +270,7 @@ static int adc_tm_get_dt_data(struct platform_device *pdev,
 		u32 sid = 0;
 		struct iio_channel *chan_adc;
 		bool non_thermal = false;
+		const char *legacy_cal = NULL;
 
 		ret = of_property_read_u32(child, "reg", &channel_num);
 		if (ret) {
@@ -282,9 +283,22 @@ static int adc_tm_get_dt_data(struct platform_device *pdev,
 			channel_num &= ADC_CHANNEL_MASK;
 		}
 
+		/*
+		 * msm-4.9 channel nodes, which vendor dtbo overlays still add,
+		 * have a qcom,calibration-type string and hold the register
+		 * field in qcom,hw-settle-time, instead of a time in us.
+		 */
+		of_property_read_string(child, "qcom,calibration-type",
+					&legacy_cal);
+
 		ret = of_property_read_u32(child, "qcom,hw-settle-time",
 							&hw_settle_time);
-		if (!ret) {
+		if (!ret && legacy_cal) {
+			if (hw_settle_time >= ADC_TM_HW_SETTLE_SAMPLES_MAX) {
+				pr_err("Invalid channel hw settle time property\n");
+				return -EINVAL;
+			}
+		} else if (!ret) {
 			ret = adc_tm_hw_settle_time_from_dt(hw_settle_time,
 							data->hw_settle);
 			if (ret < 0) {
@@ -321,7 +335,8 @@ static int adc_tm_get_dt_data(struct platform_device *pdev,
 		} else
 			fast_avg_samples = ADC_TM_DEF_AVG_SAMPLES;
 
-		if (of_property_read_bool(child, "qcom,ratiometric"))
+		if (of_property_read_bool(child, "qcom,ratiometric") ||
+		    (legacy_cal && !strcmp(legacy_cal, "ratiometric")))
 			calib_type = ADC_RATIO_CAL;
 		else
 			calib_type = ADC_ABS_CAL;
