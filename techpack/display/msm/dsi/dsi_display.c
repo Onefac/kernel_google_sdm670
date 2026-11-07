@@ -3053,7 +3053,10 @@ static bool dsi_display_check_prefix(const char *clk_prefix,
 static int dsi_display_get_clocks_count(struct dsi_display *display,
 						char *dsi_clk_name)
 {
-	if (display->fw)
+	if (display->legacy_node)
+		return of_property_count_strings(display->pdev->dev.of_node,
+			"clock-names");
+	else if (display->fw)
 		return dsi_parser_count_strings(display->parser_node,
 			dsi_clk_name);
 	else
@@ -3065,7 +3068,10 @@ static void dsi_display_get_clock_name(struct dsi_display *display,
 					char *dsi_clk_name, int index,
 					const char **clk_name)
 {
-	if (display->fw)
+	if (display->legacy_node)
+		of_property_read_string_index(display->pdev->dev.of_node,
+			"clock-names", index, clk_name);
+	else if (display->fw)
 		dsi_parser_read_string_index(display->parser_node,
 			dsi_clk_name, index, clk_name);
 	else
@@ -3157,6 +3163,23 @@ static int dsi_display_clocks_init(struct dsi_display *display)
 
 				dyn_clk_caps->dyn_clk_support = false;
 			}
+		}
+
+		/*
+		 * msm-4.9 nodes call the PLL byte and pixel muxes
+		 * src_byte_clk and src_pixel_clk: they are what the rest of
+		 * this driver knows as mux clocks.
+		 */
+		if (display->legacy_node &&
+		    dsi_display_check_prefix(src_byte, clk_name)) {
+			mux->byte_clk = dsi_clk;
+			continue;
+		}
+
+		if (display->legacy_node &&
+		    dsi_display_check_prefix(src_pixel, clk_name)) {
+			mux->pixel_clk = dsi_clk;
+			continue;
 		}
 
 		if (dsi_display_check_prefix(src_byte, clk_name)) {
@@ -3714,9 +3737,17 @@ static int dsi_display_parse_dt(struct dsi_display *display)
 		dsi_phy_name = "qcom,dsi-sec-phy-num";
 	}
 
-	display->ctrl_count = dsi_display_get_phandle_count(display,
+	if (display->legacy_node) {
+		display->ctrl_count = of_count_phandle_with_args(of_node,
+					"qcom,dsi-ctrl", NULL);
+		phy_count = of_count_phandle_with_args(of_node,
+					"qcom,dsi-phy", NULL);
+	} else {
+		display->ctrl_count = dsi_display_get_phandle_count(display,
 					dsi_ctrl_name);
-	phy_count = dsi_display_get_phandle_count(display, dsi_phy_name);
+		phy_count = dsi_display_get_phandle_count(display,
+					dsi_phy_name);
+	}
 
 	DSI_DEBUG("ctrl count=%d, phy count=%d\n",
 			display->ctrl_count, phy_count);
@@ -3736,13 +3767,15 @@ static int dsi_display_parse_dt(struct dsi_display *display)
 	display_for_each_ctrl(i, display) {
 		struct dsi_display_ctrl *ctrl = &display->ctrl[i];
 		int index;
-		index = dsi_display_get_phandle_index(display, dsi_ctrl_name,
+		index = display->legacy_node ? i :
+			dsi_display_get_phandle_index(display, dsi_ctrl_name,
 			display->ctrl_count, i);
 		ctrl->ctrl_of_node = of_parse_phandle(of_node,
 				"qcom,dsi-ctrl", index);
 		of_node_put(ctrl->ctrl_of_node);
 
-		index = dsi_display_get_phandle_index(display, dsi_phy_name,
+		index = display->legacy_node ? i :
+			dsi_display_get_phandle_index(display, dsi_phy_name,
 			display->ctrl_count, i);
 		ctrl->phy_of_node = of_parse_phandle(of_node,
 				"qcom,dsi-phy", index);
@@ -5357,6 +5390,7 @@ int dsi_display_dev_probe(struct platform_device *pdev)
 {
 	struct dsi_display *display = NULL;
 	struct device_node *node = NULL, *panel_node = NULL, *mdp_node = NULL;
+	struct device_node *legacy_panel;
 	int rc = 0, index = DSI_PRIMARY;
 	bool firm_req = false;
 	struct dsi_display_boot_param *boot_disp;
@@ -5381,17 +5415,42 @@ int dsi_display_dev_probe(struct platform_device *pdev)
 		goto end;
 	}
 
-	display->display_type = of_get_property(pdev->dev.of_node,
+	/*
+	 * msm-4.9 device trees, as in vendor dtbo overlays, have one node per
+	 * panel: its label is what the bootloader selects, and its type and
+	 * panel are given by properties of their own. Only the selected node
+	 * binds.
+	 */
+	legacy_panel = of_parse_phandle(pdev->dev.of_node, "qcom,dsi-panel", 0);
+	if (legacy_panel) {
+		display->legacy_node = true;
+		if (of_property_read_string(pdev->dev.of_node,
+				"qcom,display-type", &display->display_type))
+			display->display_type = "primary";
+	} else {
+		display->display_type = of_get_property(pdev->dev.of_node,
 				"label", NULL);
-	if (!display->display_type)
-		display->display_type = "primary";
+		if (!display->display_type)
+			display->display_type = "primary";
+	}
 
 	if (!strcmp(display->display_type, "secondary"))
 		index = DSI_SECONDARY;
 
 	boot_disp = &boot_displays[index];
 	node = pdev->dev.of_node;
-	if (boot_disp->boot_disp_en) {
+	if (display->legacy_node) {
+		const char *label = of_get_property(node, "label", NULL);
+
+		if (!boot_disp->boot_disp_en || !label ||
+		    strcmp(label, boot_disp->name)) {
+			of_node_put(legacy_panel);
+			destroy_workqueue(display->dma_cmd_workq);
+			rc = -ENODEV;
+			goto end;
+		}
+		panel_node = legacy_panel;
+	} else if (boot_disp->boot_disp_en) {
 		mdp_node = of_parse_phandle(node, "qcom,mdp", 0);
 		if (!mdp_node) {
 			DSI_ERR("mdp_node not found\n");
@@ -5422,7 +5481,8 @@ int dsi_display_dev_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, display);
 
 	/* initialize display in firmware callback */
-	if (!boot_disp->boot_disp_en && IS_ENABLED(CONFIG_DSI_PARSER)) {
+	if (!display->legacy_node && !boot_disp->boot_disp_en &&
+	    IS_ENABLED(CONFIG_DSI_PARSER)) {
 		if (!strcmp(display->display_type, "primary"))
 			firm_req = !request_firmware_nowait(
 				THIS_MODULE, 1, "dsi_prop",
@@ -5487,6 +5547,14 @@ int dsi_display_dev_remove(struct platform_device *pdev)
 	platform_set_drvdata(pdev, NULL);
 	devm_kfree(&pdev->dev, display);
 	return rc;
+}
+
+struct device_node *dsi_display_get_legacy_boot_node(int index)
+{
+	struct dsi_display *display = boot_displays[index].disp;
+
+	return display && display->legacy_node ? boot_displays[index].node :
+						 NULL;
 }
 
 int dsi_display_get_num_of_displays(void)
