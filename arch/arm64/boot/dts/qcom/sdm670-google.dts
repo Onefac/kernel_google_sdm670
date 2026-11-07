@@ -132,3 +132,51 @@
 &pm660_haptics {
 	status = "disabled";
 };
+
+/*
+ * Channels monitored by the thermal zones of sdm670-thermal.dtsi and of the
+ * Pixel overlays, which relabel them through their msm-4.9 node names. The
+ * driver needs each of them listed in io-channels.
+ */
+&pm660_adc_tm {
+	io-channels = <&pm660_vadc ADC_XO_THERM_PU2>,
+		      <&pm660_vadc ADC_AMUX_THM1_PU2>,
+		      <&pm660_vadc ADC_AMUX_THM2_PU2>,
+		      <&pm660_vadc ADC_AMUX_THM4_PU2>,
+		      <&pm660_vadc ADC_AMUX_THM5_PU2>;
+
+	chan@4c {
+		reg = <ADC_XO_THERM_PU2>;
+		label = "xo_therm";
+		qcom,ratiometric;
+		qcom,hw-settle-time = <200>;
+	};
+
+	chan@4d {
+		reg = <ADC_AMUX_THM1_PU2>;
+		label = "msm_therm";
+		qcom,ratiometric;
+		qcom,hw-settle-time = <200>;
+	};
+
+	chan@4e {
+		reg = <ADC_AMUX_THM2_PU2>;
+		label = "emmc_therm";
+		qcom,ratiometric;
+		qcom,hw-settle-time = <200>;
+	};
+
+	chan@50 {
+		reg = <ADC_AMUX_THM4_PU2>;
+		label = "pa_therm1";
+		qcom,ratiometric;
+		qcom,hw-settle-time = <200>;
+	};
+
+	chan@51 {
+		reg = <ADC_AMUX_THM5_PU2>;
+		label = "quiet_therm";
+		qcom,ratiometric;
+		qcom,hw-settle-time = <200>;
+	};
+};
