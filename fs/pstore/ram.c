@@ -687,12 +687,29 @@ static int ramoops_parse_dt(struct platform_device *pdev,
 {
 	struct device_node *of_node = pdev->dev.of_node;
 	struct resource *res;
+	struct resource region;
 	u32 value;
 	int ret;
 
 	dev_dbg(&pdev->dev, "using Device Tree\n");
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		/*
+		 * The Pixel device trees describe the area with a
+		 * "memory-region" phandle to a reserved-memory node instead
+		 * of a reg property.
+		 */
+		struct device_node *mem = of_parse_phandle(of_node,
+							   "memory-region", 0);
+
+		if (mem) {
+			ret = of_address_to_resource(mem, 0, &region);
+			of_node_put(mem);
+			if (!ret)
+				res = &region;
+		}
+	}
 	if (!res) {
 		dev_err(&pdev->dev,
 			"failed to locate DT /reserved-memory resource\n");
