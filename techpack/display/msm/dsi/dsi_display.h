@@ -143,6 +143,7 @@ struct dsi_display_ext_bridge {
  * @display_type:     Display type as defined in device tree.
  * @list:             List pointer.
  * @is_active:        Is display active.
+ * @legacy_node:      Node follows the msm-4.9 binding, one per panel.
  * @is_cont_splash_enabled:  Is continuous splash enabled
  * @sw_te_using_wd:   Is software te enabled
  * @display_lock:     Mutex for dsi_display interface.
@@ -216,6 +217,7 @@ struct dsi_display {
 	/* external bridge */
 	struct dsi_display_ext_bridge ext_bridge[MAX_DSI_CTRLS_PER_DISPLAY];
 	u32 ext_bridge_cnt;
+	bool legacy_node;
 
 	struct dsi_display_mode *modes;
 
@@ -285,6 +287,16 @@ int dsi_display_dev_remove(struct platform_device *pdev);
  *
  * Return: number of displays.
  */
+/**
+ * dsi_display_get_legacy_boot_node - node of a selected msm-4.9 style display
+ * @index: display index
+ *
+ * Such a display is not listed in the connectors of the MDP node.
+ *
+ * Return: the node, or NULL if there is no such display at this index
+ */
+struct device_node *dsi_display_get_legacy_boot_node(int index);
+
 int dsi_display_get_num_of_displays(void);
 
 /**

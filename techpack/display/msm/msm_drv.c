@@ -50,6 +50,7 @@
 #include "msm_kms.h"
 #include "msm_mmu.h"
 #include "sde_wb.h"
+#include "dsi_display.h"
 #include "sde_dbg.h"
 
 /*
@@ -2071,6 +2072,13 @@ static int add_display_components(struct device *dev,
 				break;
 
 			component_match_add(dev, matchptr, compare_of, node);
+		}
+
+		for (i = 0; i < MAX_DSI_ACTIVE_DISPLAY; i++) {
+			node = dsi_display_get_legacy_boot_node(i);
+			if (node)
+				component_match_add(dev, matchptr, compare_of,
+						    node);
 		}
 
 		return 0;
