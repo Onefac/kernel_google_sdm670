@@ -821,6 +821,21 @@ skip_fcc_step_update:
 }
 
 #define MINIMUM_PARALLEL_FCC_UA		500000
+/*
+ * Battery power supplies that do not implement POWER_SUPPLY_PROP_TAPER_CONTROL
+ * (e.g. smb5) get the stepper, which is what they have always had.
+ */
+static int pl_get_taper_control(struct pl_data *chip)
+{
+	union power_supply_propval pval = {0, };
+
+	if (power_supply_get_property(chip->batt_psy,
+				POWER_SUPPLY_PROP_TAPER_CONTROL, &pval))
+		return POWER_SUPPLY_TAPER_CONTROL_MODE_STEPPER;
+
+	return pval.intval;
+}
+
 #define PL_TAPER_WORK_DELAY_MS		500
 #define TAPER_RESIDUAL_PCT		90
 #define TAPER_REDUCTION_UA		200000
@@ -831,12 +846,7 @@ static void pl_taper_work(struct work_struct *work)
 	union power_supply_propval pval = {0, };
 	int rc;
 	int fcc_ua, total_fcc_ua, master_fcc_ua, slave_fcc_ua = 0;
-	int tcm = POWER_SUPPLY_TAPER_CONTROL_MODE_STEPPER;
-
-	rc = power_supply_get_property(chip->batt_psy,
-			POWER_SUPPLY_PROP_TAPER_CONTROL, &pval);
-	if (rc == 0)
-		tcm = pval.intval;
+	int tcm = pl_get_taper_control(chip);
 
 	chip->taper_entry_fv = get_effective_result(chip->fv_votable);
 	chip->taper_work_running = true;
@@ -1387,8 +1397,7 @@ static int pl_disable_vote_callback(struct votable *votable,
 	struct pl_data *chip = data;
 	union power_supply_propval pval = {0, };
 	int master_fcc_ua = 0, total_fcc_ua = 0, slave_fcc_ua = 0;
-	int rc = 0, cp_ilim, charge_type;
-	int tcm = POWER_SUPPLY_TAPER_CONTROL_MODE_STEPPER;
+	int rc = 0, cp_ilim, charge_type, tcm;
 	bool disable = false;
 
 	if (!is_main_available(chip))
@@ -1529,12 +1538,7 @@ static int pl_disable_vote_callback(struct votable *votable,
 		 * we could have been enabled while in taper mode,
 		 *  start the taper work if so
 		 */
-		rc = power_supply_get_property(chip->batt_psy,
-				POWER_SUPPLY_PROP_TAPER_CONTROL, &pval);
-		if (rc < 0)
-			pr_err("Couldn't get taper control state rc=%d\n", rc);
-		else
-			tcm = pval.intval;
+		tcm = pl_get_taper_control(chip);
 
 		rc = power_supply_get_property(chip->batt_psy,
 				       POWER_SUPPLY_PROP_CHARGE_TYPE, &pval);
@@ -1706,8 +1710,7 @@ static bool is_parallel_available(struct pl_data *chip)
 static void handle_main_charge_type(struct pl_data *chip)
 {
 	union power_supply_propval pval = {0, };
-	int rc, charge_type;
-	int tcm = POWER_SUPPLY_TAPER_CONTROL_MODE_STEPPER;
+	int rc, charge_type, tcm;
 
 	rc = power_supply_get_property(chip->batt_psy,
 			       POWER_SUPPLY_PROP_CHARGE_TYPE, &pval);
@@ -1717,13 +1720,7 @@ static void handle_main_charge_type(struct pl_data *chip)
 	}
 	charge_type = pval.intval;
 
-	rc = power_supply_get_property(chip->batt_psy,
-			POWER_SUPPLY_PROP_TAPER_CONTROL, &pval);
-	if (rc < 0) {
-		pr_err("Couldn't get taper control state rc=%d\n", rc);
-		return;
-	}
-	tcm = pval.intval;
+	tcm = pl_get_taper_control(chip);
 
 	/* not fast/not taper state to disables parallel */
 	if ((charge_type != POWER_SUPPLY_CHARGE_TYPE_FAST)
