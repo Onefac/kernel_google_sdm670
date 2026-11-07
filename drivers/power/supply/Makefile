@@ -87,3 +87,4 @@ obj-$(CONFIG_AXP288_CHARGER)	+= axp288_charger.o
 obj-$(CONFIG_CHARGER_CROS_USBPD)	+= cros_usbpd-charger.o
 obj-$(CONFIG_ARCH_QCOM)		+= qcom/
 obj-$(CONFIG_GOOGLE_CHARGER)	+= google_charger.o
+obj-$(CONFIG_USB_OVERHEAT_MITIGATION)	+= overheat_mitigation.o
