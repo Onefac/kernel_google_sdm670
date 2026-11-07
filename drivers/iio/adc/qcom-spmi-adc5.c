@@ -991,6 +991,64 @@ static const struct adc_channels adc_chans_rev2[ADC_MAX_CHANNEL] = {
 					SCALE_HW_CALIB_PMIC_THERM)
 };
 
+/* msm-4.9 qpnp-vadc-hc binding: the properties hold the register fields */
+static int adc_get_dt_legacy_channel_data(struct device *dev,
+					  struct adc_channel_prop *prop,
+					  struct device_node *node)
+{
+	const char *cal;
+	u32 value;
+
+	if (!of_property_read_u32(node, "qcom,decimation", &value)) {
+		if (value >= ADC_DECIMATION_SAMPLES_MAX)
+			goto invalid;
+		prop->decimation = value;
+	} else {
+		prop->decimation = ADC_DECIMATION_DEFAULT;
+	}
+
+	if (!of_property_read_u32(node, "qcom,hw-settle-time", &value)) {
+		if (value >= VADC_HW_SETTLE_SAMPLES_MAX)
+			goto invalid;
+		prop->hw_settle_time = value;
+	} else {
+		prop->hw_settle_time = VADC_DEF_HW_SETTLE_TIME;
+	}
+
+	if (!of_property_read_u32(node, "qcom,fast-avg-setup", &value)) {
+		if (BIT(value) > ADC5_AVG_SAMPLES_MAX)
+			goto invalid;
+		prop->avg_samples = value;
+	} else {
+		prop->avg_samples = VADC_DEF_AVG_SAMPLES;
+	}
+
+	/* Only the 1:1 ratio is common to both prescaler tables */
+	if (!of_property_read_u32(node, "qcom,pre-div-channel-scaling", &value)
+	    && value)
+		goto invalid;
+	prop->prescale = 0;
+
+	/* Its scale-function numbering differs: use the channel's default */
+	prop->scale_fn_type = -EINVAL;
+	prop->lut_index = VADC_DEF_LUT_INDEX;
+
+	if (!of_property_read_string(node, "qcom,calibration-type", &cal) &&
+	    !strcmp(cal, "ratiometric"))
+		prop->cal_method = ADC_RATIOMETRIC_CAL;
+	else
+		prop->cal_method = ADC_ABSOLUTE_CAL;
+
+	dev_info(dev, "%s: converted legacy qpnp-vadc-hc channel\n",
+		 node->name);
+	return 0;
+
+invalid:
+	dev_err(dev, "%s: unsupported legacy channel property value %u\n",
+		node->name, value);
+	return -EINVAL;
+}
+
 static int adc_get_dt_channel_data(struct adc_chip *adc,
 				    struct adc_channel_prop *prop,
 				    struct device_node *node,
@@ -1034,6 +1092,13 @@ static int adc_get_dt_channel_data(struct adc_chip *adc,
 		return -EINVAL;
 	}
 	prop->datasheet_name = channel_name;
+
+	if (of_find_property(node, "qcom,calibration-type", NULL)) {
+		ret = adc_get_dt_legacy_channel_data(dev, prop, node);
+		if (ret)
+			return ret;
+		goto common;
+	}
 
 	ret = of_property_read_u32(node, "qcom,decimation", &value);
 	if (!ret) {
@@ -1102,6 +1167,7 @@ static int adc_get_dt_channel_data(struct adc_chip *adc,
 	else
 		prop->cal_method = ADC_ABSOLUTE_CAL;
 
+common:
 	/*
 	 * Default to using timer calibration. Using a fresh calibration value
 	 * for every conversion will increase the overall time for a request.
