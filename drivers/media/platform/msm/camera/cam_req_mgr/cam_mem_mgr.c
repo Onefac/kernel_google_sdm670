@@ -915,7 +915,7 @@ static void cam_mem_mgr_unmap_active_buf(int idx)
 	else if (tbl.bufq[idx].flags & CAM_MEM_FLAG_HW_READ_WRITE)
 		region = CAM_SMMU_REGION_IO;
 
-	cam_mem_util_unmap_hw_va(idx, region, CAM_SMMU_MAPPING_USER);
+	cam_mem_util_unmap_hw_va(idx, region, tbl.bufq[idx].smmu_mapping_client);
 }
 
 static int cam_mem_mgr_cleanup_table(void)
