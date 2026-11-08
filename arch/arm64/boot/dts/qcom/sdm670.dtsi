@@ -2606,7 +2606,7 @@
 			label = "adsprpc-smd";
 			iommus = <&apps_smmu 0x1806 0x0>;
 			dma-coherent;
-			shared-cb;
+			shared-cb = <5>;
 		};
 	};
 
