@@ -1517,9 +1517,9 @@
 		glink_adsp: adsp {
 			qcom,remote-pid = <2>;
 			transport = "smem";
-			mboxes = <&apss_shared 8>;
+			mboxes = <&apss_shared 24>;
 			mbox-names = "adsp_smem";
-			interrupts = <GIC_SPI 156 IRQ_TYPE_EDGE_RISING>;
+			interrupts = <GIC_SPI 170 IRQ_TYPE_EDGE_RISING>;
 
 			label = "adsp";
 			qcom,glink-label = "lpass";
