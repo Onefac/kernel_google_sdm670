@@ -37,6 +37,8 @@ else
         subdir-y += qcom
     else ifeq ($(CONFIG_ARCH_SDM670),y)
         subdir-y += qcom
+        subdir-y += google
+        $(obj)/google: $(obj)/qcom
     else
         subdir-y += vendor
     endif
