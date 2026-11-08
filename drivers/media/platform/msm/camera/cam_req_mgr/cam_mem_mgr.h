@@ -1,13 +1,7 @@
-/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 and
- * only version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_MEM_MGR_H_
@@ -20,6 +14,12 @@
 
 #define CAM_MEM_BUFQ_MAX 1024
 
+/* Enum for possible mem mgr states */
+enum cam_mem_mgr_state {
+	CAM_MEM_MGR_UNINITIALIZED,
+	CAM_MEM_MGR_INITIALIZED,
+};
+
 /*Enum for possible SMMU operations */
 enum cam_smmu_mapping_client {
 	CAM_SMMU_MAPPING_USER,
@@ -29,23 +29,27 @@ enum cam_smmu_mapping_client {
 /**
  * struct cam_mem_buf_queue
  *
- * @i_hdl:       ion handle for the buffer
- * @dma_buf:     pointer to the allocated dma_buf in the table
- * @q_lock:      mutex lock for buffer
- * @hdls:        list of mapped handles
- * @num_hdl:     number of handles
- * @fd:          file descriptor of buffer
- * @buf_handle:  unique handle for buffer
- * @align:       alignment for allocation
- * @len:         size of buffer
- * @flags:       attributes of buffer
- * @vaddr:       IOVA of buffer
- * @kmdvaddr:    Kernel virtual address
- * @active:      state of the buffer
- * @is_imported: Flag indicating if buffer is imported from an FD in user space
+ * @dma_buf:        pointer to the allocated dma_buf in the table
+ * @q_lock:         mutex lock for buffer
+ * @hdls:           list of mapped handles
+ * @num_hdl:        number of handles
+ * @fd:             file descriptor of buffer
+ * @buf_handle:     unique handle for buffer
+ * @align:          alignment for allocation
+ * @len:            size of buffer
+ * @flags:          attributes of buffer
+ * @vaddr:          IOVA of buffer
+ * @kmdvaddr:       Kernel virtual address
+ * @active:         state of the buffer
+ * @is_imported:    Flag indicating if buffer is imported from an FD in user
+ *                  space
+ * @krefcount:      Reference counter to track whether the buffer is
+ *                  mapped and in use by kmd
+ * @smmu_mapping_client: Client buffer (User or kernel)
+ * @urefcount:      Reference counter to track whether the buffer is
+ *                  mapped and in use by umd
  */
 struct cam_mem_buf_queue {
-	struct ion_handle *i_hdl;
 	struct dma_buf *dma_buf;
 	struct mutex q_lock;
 	int32_t hdls[CAM_MEM_MMU_MAX_HANDLE];
@@ -56,9 +60,12 @@ struct cam_mem_buf_queue {
 	size_t len;
 	uint32_t flags;
 	uint64_t vaddr;
-	uint64_t kmdvaddr;
+	uintptr_t kmdvaddr;
 	bool active;
 	bool is_imported;
+	struct kref krefcount;
+	enum cam_smmu_mapping_client smmu_mapping_client;
+	struct kref urefcount;
 };
 
 /**
@@ -67,15 +74,17 @@ struct cam_mem_buf_queue {
  * @m_lock: mutex lock for table
  * @bitmap: bitmap of the mem mgr utility
  * @bits: max bits of the utility
- * @client: ion client pointer
  * @bufq: array of buffers
+ * @dentry: Debugfs entry
+ * @alloc_profile_enable: Whether to enable alloc profiling
  */
 struct cam_mem_table {
 	struct mutex m_lock;
 	void *bitmap;
 	size_t bits;
-	struct ion_client *client;
 	struct cam_mem_buf_queue bufq[CAM_MEM_BUFQ_MAX];
+	struct dentry *dentry;
+	bool alloc_profile_enable;
 };
 
 /**

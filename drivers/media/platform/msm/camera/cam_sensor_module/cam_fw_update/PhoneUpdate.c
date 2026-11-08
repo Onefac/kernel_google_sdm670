@@ -478,7 +478,10 @@ UINT_8 F40_FlashUpdate( UINT_8 flag, DOWNLOAD_TBL *ptr )
 	UINT_32	UlReadVal, UlCnt ;
 	UINT_8	ans, i ;
 	UINT_16	UsChkBlocks ;
-	UINT_8	UserMagicCode[ ptr->SizeMagicCode ] ;
+	UINT_8	UserMagicCode[ 256 ] ;
+
+	if( ptr->SizeMagicCode > sizeof( UserMagicCode ) )
+		return 0xF0 ;
 
 //--------------------------------------------------------------------------------
 // 0.
