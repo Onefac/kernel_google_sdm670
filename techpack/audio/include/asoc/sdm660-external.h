@@ -31,18 +31,19 @@ int msm_ext_cdc_init(struct platform_device *, struct msm_asoc_mach_data *,
 void msm_ext_register_audio_notifier(struct platform_device *pdev);
 void msm_ext_cdc_deinit(struct msm_asoc_mach_data *pdata);
 #else
-inline int msm_ext_cdc_init(struct platform_device *pdev,
-			    struct msm_asoc_mach_data *pdata,
-			    struct snd_soc_card **card,
-			    struct wcd_mbhc_config *wcd_mbhc_cfg_ptr1)
+static inline int msm_ext_cdc_init(struct platform_device *pdev,
+				   struct msm_asoc_mach_data *pdata,
+				   struct snd_soc_card **card,
+				   struct wcd_mbhc_config *wcd_mbhc_cfg_ptr1)
 {
 	return 0;
 }
 
-inline void msm_ext_register_audio_notifier(struct platform_device *pdev)
+static inline void msm_ext_register_audio_notifier(struct platform_device *pdev)
 {
 }
-inline void msm_ext_cdc_deinit(void)
+
+static inline void msm_ext_cdc_deinit(struct msm_asoc_mach_data *pdata)
 {
 }
 #endif
