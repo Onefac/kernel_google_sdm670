@@ -1084,7 +1084,7 @@ struct msm_vidc_format_constraint enc_pix_format_constraints[] = {
 		.uv_max_stride = 16384,
 		.uv_buffer_alignment = 256,
 	},
-#ifdef CONFIG_ARCH_SDM845
+#if defined(CONFIG_ARCH_SDM845) || defined(CONFIG_ARCH_SDM670)
 	{
 		.fourcc = V4L2_PIX_FMT_NV12,
 		.num_planes = 2,
@@ -1103,7 +1103,7 @@ struct msm_vidc_format_constraint enc_pix_format_constraints[] = {
 		.uv_buffer_alignment = 256,
 	},
 #endif
-#ifdef CONFIG_ARCH_SDM845
+#if defined(CONFIG_ARCH_SDM845) || defined(CONFIG_ARCH_SDM670)
 	{
 		.fourcc = V4L2_PIX_FMT_NV21,
 		.num_planes = 2,
