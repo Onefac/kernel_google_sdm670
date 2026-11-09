@@ -82,7 +82,7 @@ static void *crus_gen_afe_get_header(int length, int port, int module,
 	struct afe_custom_crus_get_config_t *config = NULL;
 	int size = sizeof(struct afe_custom_crus_get_config_t);
 	int index = afe_get_port_index(port);
-	uint16_t payload_size = sizeof(struct afe_port_param_data_v2) +
+	uint16_t payload_size = sizeof(struct param_hdr_v1) +
 				length;
 
 	/* Allocate memory for the message */
@@ -132,7 +132,7 @@ static void *crus_gen_afe_set_header(int length, int port, int module,
 	struct afe_custom_crus_set_config_t *config = NULL;
 	int size = sizeof(struct afe_custom_crus_set_config_t) + length;
 	int index = afe_get_port_index(port);
-	uint16_t payload_size = sizeof(struct afe_port_param_data_v2) +
+	uint16_t payload_size = sizeof(struct param_hdr_v1) +
 				length;
 
 	/* Allocate memory for the message */
@@ -734,10 +734,14 @@ static int msm_routing_crus_load_config(struct snd_kcontrol *kcontrol,
 	const int crus_set = ucontrol->value.integer.value[0];
 	char *config = NULL;
 	const struct firmware *firmware = NULL;
-	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
-	struct msm_pcm_drv_data *pdata = snd_soc_platform_get_drvdata(platform);
+	struct snd_soc_component *component =
+		snd_soc_kcontrol_component(kcontrol);
+	const char *config_name = NULL;
 	int rc = 0;
 	int i = 0;
+
+	of_property_read_string(component->dev->of_node, "qcom,msm-pcm-config",
+				&config_name);
 
 	mutex_lock(&crus_sp_lock);
 
@@ -765,11 +769,11 @@ static int msm_routing_crus_load_config(struct snd_kcontrol *kcontrol,
 			if (i == 0)
 				snprintf(config, CONFIG_FILE_SIZE,
 						CRUS_RX_CONFIG,
-						pdata->config_name);
+						config_name);
 			else
 				snprintf(config, CONFIG_FILE_SIZE,
 						CRUS_RX_MULTI_CONFIG,
-						pdata->config_name, i);
+						config_name, i);
 
 			if (request_firmware(&firmware, config,
 					crus_sp_device) != 0) {
@@ -799,11 +803,11 @@ static int msm_routing_crus_load_config(struct snd_kcontrol *kcontrol,
 			if (i == 0)
 				snprintf(config, CONFIG_FILE_SIZE,
 						CRUS_TX_CONFIG,
-						pdata->config_name);
+						config_name);
 			else
 				snprintf(config, CONFIG_FILE_SIZE,
 						CRUS_TX_MULTI_CONFIG,
-						pdata->config_name, i);
+						config_name, i);
 
 			if (request_firmware(&firmware, config,
 					crus_sp_device) != 0) {
@@ -1040,14 +1044,14 @@ static const struct snd_kcontrol_new crus_mixer_controls[] = {
 	msm_routing_crus_fail_det_get, msm_routing_crus_fail_det),
 };
 
-void msm_crus_pb_add_controls(struct snd_soc_platform *platform)
+void msm_crus_pb_add_controls(struct snd_soc_component *component)
 {
-	crus_sp_device = platform->dev;
+	crus_sp_device = component->dev;
 
 	if (crus_sp_device == NULL)
-		pr_err("%s: platform->dev is NULL!\n", __func__);
+		pr_err("%s: component->dev is NULL!\n", __func__);
 	else
-		pr_debug("%s: platform->dev = %lx\n", __func__,
+		pr_debug("%s: component->dev = %lx\n", __func__,
 			 (unsigned long)crus_sp_device);
 
 	if (crus_sp_usecase_dt_count == 0) {
@@ -1057,7 +1061,7 @@ void msm_crus_pb_add_controls(struct snd_soc_platform *platform)
 	crus_sp_usecase_enum[0].items = crus_sp_usecase_dt_count;
 	crus_sp_usecase_enum[0].texts = crus_sp_usecase_dt_text;
 
-	snd_soc_add_platform_controls(platform, crus_mixer_controls,
+	snd_soc_add_component_controls(component, crus_mixer_controls,
 				      ARRAY_SIZE(crus_mixer_controls));
 }
 

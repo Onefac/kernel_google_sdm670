@@ -22,18 +22,36 @@
 #include <dsp/apr_audio-v2.h>
 #include <dsp/q6afe-v2.h>
 #include <dsp/q6audio-v2.h>
-#include <uapi/sound/msm-cirrus-playback.h>
+#include <sound/msm-cirrus-playback.h>
+
+struct crus_afe_port_cmd_set_param_v2 {
+	u16 port_id;
+	u16 payload_size;
+	u32 payload_address_lsw;
+	u32 payload_address_msw;
+	u32 mem_map_handle;
+} __packed;
+
+struct crus_afe_port_cmd_get_param_v2 {
+	u16 port_id;
+	u16 payload_size;
+	u32 payload_address_lsw;
+	u32 payload_address_msw;
+	u32 mem_map_handle;
+	u32 module_id;
+	u32 param_id;
+} __packed;
 
 struct afe_custom_crus_set_config_t {
 	struct apr_hdr hdr;
-	struct afe_port_cmd_set_param_v2 param;
-	struct afe_port_param_data_v2 data;
+	struct crus_afe_port_cmd_set_param_v2 param;
+	struct param_hdr_v1 data;
 } __packed;
 
 struct afe_custom_crus_get_config_t {
 	struct apr_hdr hdr;
-	struct afe_port_cmd_get_param_v2 param;
-	struct afe_port_param_data_v2 data;
+	struct crus_afe_port_cmd_get_param_v2 param;
+	struct param_hdr_v1 data;
 } __packed;
 
 /* Payload struct for getting or setting one integer value from/to the DSP module */
@@ -137,5 +155,5 @@ extern int afe_apr_send_pkt_crus(void *data, int index, int set);
 extern int crus_afe_callback(void *payload, int size);
 extern int msm_crus_store_imped(char channel);
 extern void msm_crus_check_set_setting(unsigned char cmd);
-void msm_crus_pb_add_controls(struct snd_soc_platform *platform);
+void msm_crus_pb_add_controls(struct snd_soc_component *component);
 #endif /* _MSM_CIRRUS_PLAYBACK_H */
