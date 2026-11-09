@@ -123,6 +123,7 @@
 		pinctrl-0 = <&sde_dsi_active &sde_te_active>;
 		pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
 		qcom,platform-te-gpio = <&tlmm 10 0>;
+		qcom,panel-te-source = <0>;
 
 		qcom,dsi-panel = <&dsi_sofef00_sdc_1080p_cmd>;
 		vci-supply = <&pm660l_l6>; /* 3008mV */
@@ -143,6 +144,7 @@
 		pinctrl-0 = <&sde_dsi_active &sde_te_active>;
 		pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
 		qcom,platform-te-gpio = <&tlmm 10 0>;
+		qcom,panel-te-source = <0>;
 
 		qcom,dsi-panel = <&dsi_s6e3fa7_sdc_1080p_cmd>;
 		vci-supply = <&pm660l_l6>; /* 3008mV */
@@ -163,6 +165,7 @@
 		pinctrl-0 = <&sde_dsi_active &sde_te_active>;
 		pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
 		qcom,platform-te-gpio = <&tlmm 10 0>;
+		qcom,panel-te-source = <0>;
 
 		qcom,dsi-panel = <&dsi_nt37700f_tianma_1080p_cmd>;
 		vci-supply = <&pm660l_l6>; /* 3008mV */
