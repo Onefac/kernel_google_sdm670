@@ -611,7 +611,9 @@ static int __init audio_notifier_init(void)
 {
 	int ret;
 
+#ifdef MODULE
 	audio_notifier_subsys_init();
+#endif
 
 	ret = audio_pdr_register(&pdr_nb);
 	if (ret < 0) {
@@ -621,20 +623,30 @@ static int __init audio_notifier_init(void)
 	}
 
 	/* Do not return error since PDR enablement is not critical */
+#ifdef MODULE
 	audio_notifier_late_init();
+#endif
 
 	return 0;
 }
 #else
 static int __init audio_notifier_init(void)
 {
+#ifdef MODULE
 	audio_notifier_subsys_init();
+#endif
 	audio_notifer_disable_service(AUDIO_NOTIFIER_PDR_SERVICE);
 
+#ifdef MODULE
 	audio_notifier_late_init();
+#endif
 
 	return 0;
 }
+#endif
+#ifndef MODULE
+subsys_initcall(audio_notifier_subsys_init);
+late_initcall(audio_notifier_late_init);
 #endif
 module_init(audio_notifier_init);
 
