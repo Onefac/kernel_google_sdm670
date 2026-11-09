@@ -2178,6 +2178,10 @@ static struct msm_vidc_platform_data sdm670_data = {
 	.vpu_ver = VPU_VERSION_AR50,
 	.num_vpp_pipes = 0x1,
 	.ubwc_config = 0x0,
+	.codecs = default_codecs,
+	.codecs_count = ARRAY_SIZE(default_codecs),
+	.codec_caps = sdm845_capabilities,
+	.codec_caps_count = ARRAY_SIZE(sdm845_capabilities),
 	.max_inst_count = MAX_SUPPORTED_INSTANCES,
 };
 
