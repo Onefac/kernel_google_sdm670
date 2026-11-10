@@ -52,7 +52,7 @@
 #endif
 
 #ifdef CONFIG_TOUCHSCREEN_TBN
-#include "../touch_bus_negotiator.h"
+#include <linux/input/touch_bus_negotiator.h>
 #endif
 #include <linux/pm_qos.h>
 
