@@ -2298,6 +2298,8 @@ void *vidc_get_drv_data(struct device *dev)
 {
 	struct msm_vidc_platform_data *driver_data = NULL;
 	const struct of_device_id *match;
+	struct msm_vidc_codec_capability *cap;
+	u32 i;
 	uint32_t ddr_type = DDR_TYPE_LPDDR5;
 	int rc = 0;
 
@@ -2327,6 +2329,11 @@ void *vidc_get_drv_data(struct device *dev)
 			driver_data->common_data = sdm670_common_data_v1;
 			driver_data->common_data_length =
 					ARRAY_SIZE(sdm670_common_data_v1);
+			for (i = 0; i < driver_data->codec_caps_count; i++) {
+				cap = &driver_data->codec_caps[i];
+				if (cap->capability_type == CAP_MAX_VIDEOCORES)
+					cap->max = cap->default_value = 1;
+			}
 		}
 	} else if (!strcmp(match->compatible, "qcom,lito-vidc")) {
 		if (driver_data->sku_version == SKU_VERSION_1) {
